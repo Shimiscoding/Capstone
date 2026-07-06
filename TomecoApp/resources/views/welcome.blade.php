@@ -3,12 +3,28 @@
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-status-bar-style" content="#01db79">
         <title>{{ config('app.name', 'Laravel') }}</title>
 
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600" rel="stylesheet" />
+        <link rel=manifest href="/manifest.json">
+        
+        <link rel="icon" sizes="48x48" href="/pwa/icons/android/launchericon-48x48.png">
+        <link rel="icon" sizes="72x72" href="/pwa/icons/android/launchericon-72x72.png">
+        <link rel="icon" sizes="96x96" href="/pwa/icons/android/launchericon-96x96.png">
+        <link rel="icon" sizes="144x144" href="/pwa/icons/android/launchericon-144x144.png">
+        <link rel="icon" sizes="192x192" href="/pwa/icons/android/launchericon-192x192.png">
+        <link rel="icon" sizes="512x512" href="/pwa/icons/android/launchericon-512x512.png">
+
+        <link href="/pwa/icons/ios/1024.png" sizes="1024x1024" rel="apple-touch-startup-image">
+        <link href="/pwa/icons/ios/512.png" sizes="512x512" rel="apple-touch-startup-image">
+        <link href="/pwa/icons/ios/256.png" sizes="256x256" rel="apple-touch-startup-image">
+        <link href="/pwa/icons/ios/192.png" sizes="192x192" rel="apple-touch-startup-image">
+
+
 
         <!-- Styles / Scripts -->
         @if (file_exists(public_path('build/manifest.json')) || file_exists(public_path('hot')))
@@ -273,5 +289,7 @@
         @if (Route::has('login'))
             <div class="h-14.5 hidden lg:block"></div>
         @endif
+
+         @vite(['resources/js/app.js'])
     </body>
 </html>
