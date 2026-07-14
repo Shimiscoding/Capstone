@@ -99,18 +99,6 @@
       top: 4px;
     }
 
-    .course-avatar {
-      display: grid;
-      width: 22px;
-      height: 22px;
-      place-items: center;
-      border-radius: 5px;
-      background: #991b1b;
-      color: #fff;
-      font-size: 7px;
-      font-weight: 700;
-      line-height: 1;
-    }
 
     .brand-title {
       min-width: 0;
@@ -269,15 +257,6 @@
       font-weight: 600;
       text-align: left;
       text-decoration: none;
-    }
-
-    .brand-logo {
-      display: block;
-      width: 28px;
-      height: 28px;
-      flex: 0 0 auto;
-      border-radius: 6px;
-      object-fit: contain;
     }
 
     a.nav-item,
@@ -609,13 +588,7 @@
         min-width: 42px;
       }
 
-      .course-avatar,
-      .brand-title,
-      .plain-button,
-      .search,
-      .amount-pill {
-        display: none;
-      }
+
 
       .sidebar {
         padding: 14px 8px;

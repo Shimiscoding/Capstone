@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Log in</title>
     <link rel="stylesheet" href="{{ asset('css/auth.css') }}">
+    <link rel="icon" href="{{ asset('images/favicon.ico') }}">
 </head>
 <body class="auth-page">
     <main class="auth-shell">

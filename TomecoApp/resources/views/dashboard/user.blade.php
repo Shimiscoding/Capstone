@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Dashboard</title>
     <link rel="stylesheet" href="{{ asset('css/dashboard.css') }}?v={{ filemtime(public_path('css/dashboard.css')) }}">
-    <link rel="icon" href="{{ asset('images/favicon.ico') }}">
+     <link rel="icon" href="{{ asset('images/favicon.ico') }}">
 </head>
 
 <body>
@@ -28,10 +28,10 @@
         </button>
       </div>
 
-      <div class="search">
+      <form class="search" method="GET" action="{{ route('dashboard.users') }}" role="search">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-        <input type="search" placeholder="Search dashboard" aria-label="Search dashboard">
-      </div>
+        <input type="search" name="search" value="{{ $search }}" placeholder="Search users">
+      </form>
 
       <div class="topbar-spacer"></div>
 
@@ -57,7 +57,7 @@
 
         <nav class="nav-section">
           <p class="section-label">Dashboard</p>
-           <a class="nav-item is-active" href="{{ route('dashboard') }}">
+           <a class="nav-item" href="{{ route('dashboard') }}">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10.5V20h5v-6h4v6h5v-9.5"/></svg>
             <span class="nav-text">Home dashboard</span>
           </a>
@@ -69,7 +69,7 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18"/></svg>
             <span class="nav-text">Payments</span>
           </a>
-          <a class="nav-item" href="{{ route('dashboard.users') }}">
+          <a class="nav-item is-active" href="{{ route('dashboard.users') }}">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/></svg>
             <span class="nav-text">Users</span>
           </a>
@@ -140,43 +140,16 @@
 
     <main class="content">
       <section class="workspace">
-        <div class="page-head home-page-head">
+        <div class="page-head users-page-head">
           <div>
-            <p class="eyebrow">TOMECO overview</p>
-            <h1>Home dashboard</h1>
-            <p class="page-description">Welcome back, {{ $user->fullName }}. Here is what is happening today.</p>
+            <p class="eyebrow">User management</p>
+            <h1>Users</h1>
+            <p class="page-description">View all registered TOMECO accounts and their contact details.</p>
           </div>
-          <div class="dashboard-date">{{ now()->format('F d, Y') }}</div>
+          <div class="user-count">{{ number_format($users->total()) }} {{ \Illuminate\Support\Str::plural('user', $users->total()) }}</div>
         </div>
 
-        <div class="overview-grid">
-          <article class="overview-card overview-card-primary"><div class="overview-icon">U</div><div><p>Total registered users</p><strong>{{ number_format($totalUsers) }}</strong><span>All TOMECO accounts</span></div></article>
-          <article class="overview-card"><div class="overview-icon">+</div><div><p>New users this month</p><strong>{{ number_format($newUsersThisMonth) }}</strong><span>{{ now()->format('F Y') }}</span></div></article>
-          <article class="overview-card"><div class="overview-icon">A</div><div><p>Account status</p><strong>Active</strong><span>System access protected</span></div></article>
-        </div>
-
-        <div class="home-content-grid">
-          <section class="dashboard-panel">
-            <div class="panel-heading"><div><h2>Recently registered</h2><p>Latest accounts added to TOMECO</p></div><a href="{{ route('dashboard.users') }}">View all users</a></div>
-            <div class="recent-list">
-              @forelse ($recentUsers as $recentUser)
-                <div class="recent-user"><span class="table-avatar">{{ strtoupper(substr($recentUser->fullName ?: 'U', 0, 1)) }}</span><span class="recent-details"><strong>{{ $recentUser->fullName ?: 'Unnamed user' }}</strong><small>{{ $recentUser->email }}</small></span><span class="recent-date">{{ $recentUser->created_at?->format('M d, Y') ?? '-' }}</span></div>
-              @empty
-                <div class="home-empty">No registered users yet.</div>
-              @endforelse
-            </div>
-          </section>
-          <aside class="dashboard-panel quick-panel">
-            <div class="panel-heading"><div><h2>Quick actions</h2><p>Common dashboard tasks</p></div></div>
-            <a class="quick-action" href="{{ route('dashboard.users') }}"><span>View users</span><b>&rarr;</b></a>
-            <div class="quick-action is-disabled"><span>Review payments</span><small>Coming soon</small></div>
-            <div class="quick-action is-disabled"><span>View analytics</span><small>Coming soon</small></div>
-          </aside>
-        </div>
-
-        {{-- User management is available on the dedicated dashboard.users page. --}}
-        @if (false)
-        <div class="table-card home-hidden-table">
+        <div class="table-card">
           <div class="table-scroll">
             <table class="users-table">
               <thead>
@@ -241,7 +214,6 @@
             </div>
           @endif
         </div>
-        @endif
       </section>
     </main>
   </div>

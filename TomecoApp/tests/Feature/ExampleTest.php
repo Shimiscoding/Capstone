@@ -41,7 +41,9 @@ class ExampleTest extends TestCase
     public function test_users_can_register(): void
     {
         $this->post('/register', [
-            'name' => 'New User',
+            'fullName' => 'New User',
+            'badgeNumber' => 'BDG-100001',
+            'phoneNumber' => '09170000001',
             'email' => 'new@example.com',
             'password' => 'password',
             'password_confirmation' => 'password',
@@ -49,7 +51,9 @@ class ExampleTest extends TestCase
 
         $this->assertAuthenticated();
         $this->assertDatabaseHas('users', [
-            'name' => 'New User',
+            'fullName' => 'New User',
+            'badgeNumber' => 'BDG-100001',
+            'phoneNumber' => '09170000001',
             'email' => 'new@example.com',
         ]);
     }
@@ -57,7 +61,7 @@ class ExampleTest extends TestCase
     public function test_authenticated_users_can_view_dashboard(): void
     {
         $user = User::factory()->create([
-            'name' => 'Dashboard User',
+            'fullName' => 'Dashboard User',
             'email' => 'dashboard@example.com',
         ]);
 

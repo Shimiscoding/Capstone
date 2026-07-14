@@ -16,9 +16,25 @@
                 @csrf
 
                 <div>
-                    <label for="name" class="auth-label">Name</label>
-                    <input id="name" name="name" type="text" value="{{ old('name') }}" autocomplete="name" required autofocus class="auth-input">
-                    @error('name')
+                    <label for="fullName" class="auth-label">Full name</label>
+                    <input id="fullName" name="fullName" type="text" value="{{ old('fullName') }}" autocomplete="name" required autofocus class="auth-input">
+                    @error('fullName')
+                        <p class="auth-error">{{ $message }}</p>
+                    @enderror
+                </div>
+
+                <div>
+                    <label for="badgeNumber" class="auth-label">Badge number</label>
+                    <input id="badgeNumber" name="badgeNumber" type="text" value="{{ old('badgeNumber') }}" required class="auth-input">
+                    @error('badgeNumber')
+                        <p class="auth-error">{{ $message }}</p>
+                    @enderror
+                </div>
+
+                <div>
+                    <label for="phoneNumber" class="auth-label">Phone number</label>
+                    <input id="phoneNumber" name="phoneNumber" type="tel" value="{{ old('phoneNumber') }}" autocomplete="tel" required class="auth-input">
+                    @error('phoneNumber')
                         <p class="auth-error">{{ $message }}</p>
                     @enderror
                 </div>
