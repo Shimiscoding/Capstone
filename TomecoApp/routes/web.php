@@ -27,7 +27,12 @@ Route::middleware('guest')->group(function () {
 Route::middleware('auth')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/dashboard/users', [DashboardController::class, 'users'])->name('dashboard.users');
+    Route::get('/dashboard/users/create', [DashboardController::class, 'createUser'])->name('dashboard.users.create');
+    Route::post('/dashboard/users', [DashboardController::class, 'storeUser'])->name('dashboard.users.store');
     Route::get('/dashboard/payments', [DashboardController::class, 'payments'])->name('dashboard.payments');
+    Route::get('/dashboard/impounding', [DashboardController::class, 'impounding'])->name('dashboard.impounding');
+
+
 
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 });

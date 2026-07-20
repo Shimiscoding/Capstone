@@ -35,6 +35,7 @@ class UserApiTest extends TestCase
             'badgeNumber' => 'BDG-200001',
             'phoneNumber' => '09170000002',
             'email' => 'api-user@example.com',
+            'role' => User::ROLE_ADMIN,
             'password' => 'password',
         ]);
 
@@ -43,10 +44,12 @@ class UserApiTest extends TestCase
             ->assertJsonPath('success', true)
             ->assertJsonPath('message', 'User created successfully.')
             ->assertJsonPath('data.fullName', 'API User')
+            ->assertJsonPath('data.role', User::ROLE_DRIVER)
             ->assertJsonMissingPath('data.password');
 
         $user = User::where('email', 'api-user@example.com')->firstOrFail();
 
+        $this->assertSame(User::ROLE_DRIVER, $user->role);
         $this->assertTrue(Hash::check('password', $user->password));
     }
 

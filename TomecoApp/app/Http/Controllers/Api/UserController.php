@@ -23,11 +23,15 @@ class UserController extends Controller
     {
         $validated = $request->validate([
             'fullName' => ['required', 'string', 'max:255'],
-            'badgeNumber' => ['required', 'string', 'max:50', 'unique:users,badgeNumber'],
             'phoneNumber' => ['required', 'string', 'max:30', 'unique:users,phoneNumber'],
+            'driverLicense' => ['nullable', 'string', 'max:255', 'unique:users,driverLicense'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', Password::min(8)],
         ]);
+
+        // Public/mobile registration is exclusively for driver accounts.
+        // Never trust a role supplied by the client.
+        $validated['role'] = User::ROLE_DRIVER;
 
         $user = User::create($validated);
 
@@ -50,27 +54,10 @@ class UserController extends Controller
     {
         $validated = $request->validate([
             'fullName' => ['sometimes', 'required', 'string', 'max:255'],
-            'badgeNumber' => [
-                'sometimes',
-                'required',
-                'string',
-                'max:50',
-                Rule::unique('users', 'badgeNumber')->ignore($user),
-            ],
-            'phoneNumber' => [
-                'sometimes',
-                'required',
-                'string',
-                'max:30',
-                Rule::unique('users', 'phoneNumber')->ignore($user),
-            ],
-            'email' => [
-                'sometimes',
-                'required',
-                'email',
-                'max:255',
-                Rule::unique('users', 'email')->ignore($user),
-            ],
+            'phoneNumber' => ['sometimes', 'required', 'string', 'max:30', Rule::unique('users', 'phoneNumber')->ignore($user)],
+            'driverLicense' => ['sometimes', 'nullable', 'string', 'max:255', Rule::unique('users', 'driverLicense')->ignore($user)],
+            'email' => ['sometimes', 'required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user)],
+            'role' => ['sometimes', Rule::in(User::ROLES)],
             'password' => ['sometimes', 'required', Password::min(8)],
         ]);
 

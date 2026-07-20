@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Dashboard</title>
+    <title>Add user | TOMECO</title>
     <link rel="stylesheet" href="{{ asset('css/dashboard.css') }}?v={{ filemtime(public_path('css/dashboard.css')) }}">
      <link rel="icon" href="{{ asset('images/favicon.ico') }}">
 </head>
@@ -30,7 +30,7 @@
 
       <form class="search" method="GET" action="{{ route('dashboard.users') }}" role="search">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-        <input type="search" name="search" value="{{ $search }}" placeholder="Search users">
+        <input type="search" name="search" placeholder="Search users">
       </form>
 
       <div class="topbar-spacer"></div>
@@ -95,7 +95,7 @@
           </button>
           <button class="nav-item">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M7 3h10l2 2v16l-3-2-3 2-3-2-3 2-2-1V5Z"/><path d="M9 8h6M9 12h6M9 16h4"/></svg>
-            <span class="nav-text">Invoices</span>
+            <span class="nav-text">Summon</span>
           </button>
         </nav>
 
@@ -143,76 +143,39 @@
         <div class="page-head users-page-head">
           <div>
             <p class="eyebrow">User management</p>
-            <h1>Users</h1>
-            <p class="page-description">View all registered TOMECO accounts and their contact details.</p>
+            <h1>Create user</h1>
+            <p class="page-description">Add a TOMECO account and assign the appropriate role.</p>
           </div>
-          <div class="user-count">{{ number_format($users->total()) }} {{ \Illuminate\Support\Str::plural('user', $users->total()) }}</div>
+          <a class="page-button" href="{{ route('dashboard.users') }}">Back to users</a>
         </div>
 
-        <div class="table-card">
-          <div class="table-scroll">
-            <table class="users-table">
-              <thead>
-                <tr>
-                  <th scope="col">User</th>
-                  <th scope="col">Badge number</th>
-                  <th scope="col">Phone number</th>
-                  <th scope="col">Joined</th>
-                  <th scope="col">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                @forelse ($users as $listedUser)
-                  @php
-                    $listedName = $listedUser->fullName ?: 'Unnamed user';
-                    $listedInitials = collect(explode(' ', $listedName))
-                      ->filter()->map(fn ($part) => strtoupper(substr($part, 0, 1)))
-                      ->take(2)->join('');
-                  @endphp
-                  <tr>
-                    <td>
-                      <div class="user-cell">
-                        <span class="table-avatar">{{ $listedInitials ?: 'U' }}</span>
-                        <span>
-                          <strong>{{ $listedName }}</strong>
-                          <small>{{ $listedUser->email }}</small>
-                        </span>
-                      </div>
-                    </td>
-                    <td><span class="badge-number">{{ $listedUser->badgeNumber ?: '—' }}</span></td>
-                    <td>{{ $listedUser->phoneNumber ?: '—' }}</td>
-                    <td>{{ $listedUser->created_at?->format('M d, Y') ?? '—' }}</td>
-                    <td><span class="status-badge"><i></i> Registered</span></td>
-                  </tr>
-                @empty
-                  <tr>
-                    <td colspan="5" class="empty-state">
-                      <strong>{{ $search !== '' ? 'No users found' : 'No registered users yet' }}</strong>
-                      <span>{{ $search !== '' ? 'Try a different name, badge, phone number, or email.' : 'Newly registered accounts will appear here.' }}</span>
-                    </td>
-                  </tr>
-                @endforelse
-              </tbody>
-            </table>
-          </div>
+        <div class="create-user-card">
+          <form method="POST" action="{{ route('dashboard.users.store') }}">
+            @csrf
 
-          @if ($users->hasPages())
-            <div class="table-footer">
-              <span>Showing {{ $users->firstItem() }}–{{ $users->lastItem() }} of {{ $users->total() }}</span>
-              <div class="pagination-actions">
-                @if ($users->onFirstPage())
-                  <span class="page-button is-disabled">Previous</span>
-                @else
-                  <a class="page-button" href="{{ $users->previousPageUrl() }}">Previous</a>
-                @endif
-                @if ($users->hasMorePages())
-                  <a class="page-button" href="{{ $users->nextPageUrl() }}">Next</a>
-                @else
-                  <span class="page-button is-disabled">Next</span>
-                @endif
+            <div class="user-form-grid">
+              <div><label for="fullName">Full name</label><input id="fullName" name="fullName" type="text" value="{{ old('fullName') }}" autocomplete="name" required autofocus>@error('fullName')<small>{{ $message }}</small>@enderror</div>
+              <div><label for="badgeNumber">Badge number</label><input id="badgeNumber" name="badgeNumber" type="text" value="{{ old('badgeNumber') }}" required>@error('badgeNumber')<small>{{ $message }}</small>@enderror</div>
+              <div><label for="phoneNumber">Phone number</label><input id="phoneNumber" name="phoneNumber" type="tel" value="{{ old('phoneNumber') }}" autocomplete="tel" required>@error('phoneNumber')<small>{{ $message }}</small>@enderror</div>
+              <div><label for="email">Email address</label><input id="email" name="email" type="email" value="{{ old('email') }}" autocomplete="email" required>@error('email')<small>{{ $message }}</small>@enderror</div>
+              <div>
+                <label for="role">Role</label>
+                <select id="role" name="role" required>
+                  <option value="officer" @selected(old('role', 'officer') === 'officer')>Officer</option>
+                  <option value="driver" @selected(old('role') === 'driver')>Driver</option>
+                  <option value="admin" @selected(old('role') === 'admin')>Admin</option>
+                </select>
+                @error('role')<small>{{ $message }}</small>@enderror
               </div>
+              <div><label for="password">Temporary password</label><input id="password" name="password" type="password" autocomplete="new-password" required>@error('password')<small>{{ $message }}</small>@enderror</div>
+              <div><label for="password_confirmation">Confirm password</label><input id="password_confirmation" name="password_confirmation" type="password" autocomplete="new-password" required></div>
             </div>
-          @endif
+
+            <div class="user-form-actions">
+              <a class="page-button" href="{{ route('dashboard.users') }}">Cancel</a>
+              <button type="submit">Create user</button>
+            </div>
+          </form>
         </div>
       </section>
     </main>
