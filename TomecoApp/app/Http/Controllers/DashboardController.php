@@ -3,9 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Notifications\UserActivityNotification;
+use App\Notifications\UserCreatedNotification;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\Rule;
 
 class DashboardController extends Controller
@@ -42,22 +45,26 @@ class DashboardController extends Controller
         $this->ensureAdmin($request);
 
         $search = trim((string) $request->query('search', ''));
+        $role = in_array($request->query('role'), User::ROLES, true)
+            ? $request->query('role')
+            : '';
+        $sort = in_array($request->query('sort'), ['latest', 'oldest', 'name_asc', 'name_desc'], true)
+            ? $request->query('sort')
+            : 'latest';
 
         $users = User::query()
             ->when($search !== '', function ($query) use ($search) {
-                $query->where(function ($query) use ($search) {
-                    $query->where('fullName', 'like', "%{$search}%")
-                        ->orWhere('badgeNumber', 'like', "%{$search}%")
-                        ->orWhere('phoneNumber', 'like', "%{$search}%")
-                        ->orWhere('email', 'like', "%{$search}%")
-                        ->orWhere('role', 'like', "%{$search}%");
-                });
+                $query->where('fullName', 'like', "%{$search}%");
             })
-            ->orderByDesc('created_at')
+            ->when($role !== '', fn ($query) => $query->where('role', $role))
+            ->when($sort === 'latest', fn ($query) => $query->orderByDesc('created_at'))
+            ->when($sort === 'oldest', fn ($query) => $query->orderBy('created_at'))
+            ->when($sort === 'name_asc', fn ($query) => $query->orderBy('fullName'))
+            ->when($sort === 'name_desc', fn ($query) => $query->orderByDesc('fullName'))
             ->paginate(10)
             ->withQueryString();
 
-        return view('dashboard.users.user', compact('users', 'search'));
+        return view('dashboard.users.user', compact('users', 'search', 'role', 'sort'));
     }
 
     public function createUser(Request $request): View
@@ -73,16 +80,85 @@ class DashboardController extends Controller
 
         $attributes = $request->validate([
             'fullName' => ['required', 'string', 'max:255'],
-            'badgeNumber' => ['required', 'string', 'max:50', 'unique:users,badgeNumber'],
+            'badgeNumber' => ['exclude_if:role,'.User::ROLE_DRIVER, 'required', 'string', 'max:50', 'unique:users,badgeNumber'],
+            'plateNumber' => ['exclude_unless:role,'.User::ROLE_DRIVER, 'required', 'string', 'max:50', 'unique:users,plateNumber'],
             'phoneNumber' => ['required', 'string', 'max:30', 'unique:users,phoneNumber'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'role' => ['required', Rule::in(User::ROLES)],
             'password' => ['required', 'confirmed', 'min:8'],
         ]);
 
-        User::create($attributes);
+        $attributes['badgeNumber'] = $attributes['role'] === User::ROLE_DRIVER ? null : $attributes['badgeNumber'];
+        $attributes['plateNumber'] = $attributes['role'] === User::ROLE_DRIVER ? $attributes['plateNumber'] : null;
+
+        $createdUser = User::create($attributes);
+        Notification::send(User::where('role', User::ROLE_ADMIN)->get(), new UserCreatedNotification($createdUser));
 
         return redirect()->route('dashboard.users')->with('success', 'User account created successfully.');
+    }
+
+    public function editUser(Request $request, User $user): View
+    {
+        $this->ensureAdmin($request);
+
+        return view('dashboard.users.user-create', ['editedUser' => $user]);
+    }
+
+    public function updateUser(Request $request, User $user): RedirectResponse
+    {
+        $this->ensureAdmin($request);
+
+        $attributes = $request->validate([
+            'fullName' => ['required', 'string', 'max:255'],
+            'badgeNumber' => ['exclude_if:role,'.User::ROLE_DRIVER, 'required', 'string', 'max:50', Rule::unique('users', 'badgeNumber')->ignore($user)],
+            'plateNumber' => ['exclude_unless:role,'.User::ROLE_DRIVER, 'required', 'string', 'max:50', Rule::unique('users', 'plateNumber')->ignore($user)],
+            'phoneNumber' => ['required', 'string', 'max:30', Rule::unique('users', 'phoneNumber')->ignore($user)],
+            'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user)],
+            'role' => ['required', Rule::in(User::ROLES)],
+            'password' => ['nullable', 'confirmed', 'min:8'],
+        ]);
+
+        $attributes['badgeNumber'] = $attributes['role'] === User::ROLE_DRIVER ? null : $attributes['badgeNumber'];
+        $attributes['plateNumber'] = $attributes['role'] === User::ROLE_DRIVER ? $attributes['plateNumber'] : null;
+
+        if (blank($attributes['password'] ?? null)) {
+            unset($attributes['password']);
+        }
+
+        $user->update($attributes);
+        Notification::send(
+            User::where('role', User::ROLE_ADMIN)->get(),
+            new UserActivityNotification('updated', $user->fullName, $user->role),
+        );
+
+        return redirect()->route('dashboard.users')->with('success', 'User account updated successfully.');
+    }
+
+    public function destroyUser(Request $request, User $user): RedirectResponse
+    {
+        $this->ensureAdmin($request);
+
+        if ($request->user()->is($user)) {
+            return redirect()->route('dashboard.users')->with('error', 'You cannot delete your own account.');
+        }
+
+        $deletedUserName = $user->fullName;
+        $deletedUserRole = $user->role;
+        $user->delete();
+
+        Notification::send(
+            User::where('role', User::ROLE_ADMIN)->get(),
+            new UserActivityNotification('deleted', $deletedUserName, $deletedUserRole),
+        );
+
+        return redirect()->route('dashboard.users')->with('success', 'User account deleted successfully.');
+    }
+
+    public function markNotificationsRead(Request $request): RedirectResponse
+    {
+        $request->user()->unreadNotifications->markAsRead();
+
+        return back()->with('success', 'Notifications marked as read.');
     }
 
     private function ensureAdmin(Request $request): void

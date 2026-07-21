@@ -30,6 +30,7 @@ class User extends Authenticatable
         'badgeNumber',
         'phoneNumber',
         'driverLicense',
+        'plateNumber',
         'email',
         'role',
         'password',

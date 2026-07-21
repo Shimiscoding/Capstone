@@ -33,6 +33,7 @@ class UserApiTest extends TestCase
         $response = $this->postJson('/api/users', [
             'fullName' => 'API User',
             'badgeNumber' => 'BDG-200001',
+            'plateNumber' => 'API-2001',
             'phoneNumber' => '09170000002',
             'email' => 'api-user@example.com',
             'role' => User::ROLE_ADMIN,

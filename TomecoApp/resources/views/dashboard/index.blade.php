@@ -1,249 +1,36 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Dashboard</title>
-    <link rel="stylesheet" href="{{ asset('css/dashboard.css') }}?v={{ filemtime(public_path('css/dashboard.css')) }}">
-    <link rel="icon" href="{{ asset('images/favicon.ico') }}">
-</head>
+@extends('layouts.dashboard')
 
-<body>
-  @php
-    $user = auth()->user();
-    $initials = collect(explode(' ', $user->fullName))
-      ->filter()
-      ->map(fn ($part) => strtoupper(substr($part, 0, 1)))
-      ->take(2)
-      ->join('');
-  @endphp
+@section('title', 'Dashboard')
+@section('activePage', 'dashboard')
 
-  <div class="app-frame">
-    <header class="topbar">
-      <div class="brand-switcher">
-        <img class="brand-logo" src="{{ asset('images/favicon.ico') }}" alt="TOMECO logo">
-        <div class="brand-title">TOMECO</div>
-        <button class="plain-button" aria-label="Switch business">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m8 9 4-4 4 4"/><path d="m16 15-4 4-4-4"/></svg>
-        </button>
-      </div>
-
-      <div class="search">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-        <input type="search" placeholder="Search dashboard" aria-label="Search dashboard">
-      </div>
-
-      <div class="topbar-spacer"></div>
-
-      <button class="icon-button notif" aria-label="Messages">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 12a8 8 0 0 1-8 8H7l-4 3v-6.2A8 8 0 1 1 21 12Z"/><path d="M8 12h.01M12 12h.01M16 12h.01"/></svg>
-      </button>
-      <button class="icon-button" aria-label="Shortcuts">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m13 2-2 8h8L9 22l2-8H5L13 2Z"/></svg>
-      </button>
-      <button class="icon-button" aria-label="Notifications">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 8-3 8h18s-3-1-3-8"/><path d="M10 21h4"/></svg>
-      </button>
-      <div class="amount-pill">{{ $user->email }}</div>
-      <form method="POST" action="{{ route('logout') }}" class="logout-form">
-        @csrf
-        <button type="submit" class="logout-top-button">Log out</button>
-      </form>
-      <button class="profile" aria-label="Account">{{ $initials ?: 'U' }}</button>
-    </header>
-
-    <aside class="sidebar" aria-label="Main navigation">
-      <div class="sidebar-scroll">
-
-        <nav class="nav-section">
-          <p class="section-label">Dashboard</p>
-           <a class="nav-item is-active" href="{{ route('dashboard') }}">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10.5V20h5v-6h4v6h5v-9.5"/></svg>
-            <span class="nav-text">Home dashboard</span>
-          </a>
-          <button class="nav-item">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 19V5"/><path d="m7 15 4-4 3 3 5-6"/></svg>
-            <span class="nav-text">Analytics</span>
-          </button>
-          <a class="nav-item" href="{{ route('dashboard.payments') }}">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18"/></svg>
-            <span class="nav-text">Payments</span>
-          </a>
-          <a class="nav-item" href="{{ route('dashboard.users') }}">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/></svg>
-            <span class="nav-text">Users</span>
-          </a>
-          <button class="nav-item">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 10h16"/><path d="M5 10 12 4l7 6"/><path d="M6 10v8M10 10v8M14 10v8M18 10v8"/><path d="M3 18h18"/></svg>
-            <span class="nav-text">Balances</span>
-          </button>
-          <button class="nav-item">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
-            <span class="nav-text">Support chats</span>
-          </button>
-        </nav>
-
-        <nav class="nav-section">
-          <p class="section-label">Pinned</p>
-          <a class="nav-item is-active" href="{{ route('dashboard.impounding') }}">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="4" y="5" width="16" height="14" rx="3"/><path d="m8 9 4 3 4-3"/></svg>
-            <span class="nav-text">Impound Vehicles</span>
-          </a>
-          <button class="nav-item">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1-1"/></svg>
-            <span class="nav-text">Checkout links</span>
-          </button>
-          <button class="nav-item">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M7 3h10l2 2v16l-3-2-3 2-3-2-3 2-2-1V5Z"/><path d="M9 8h6M9 12h6M9 16h4"/></svg>
-            <span class="nav-text">Summon</span>
-          </button>
-        </nav>
-
-        <nav class="nav-section">
-          <p class="section-label">All tools</p>
-          <button class="nav-item">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 12h16"/><path d="M8 4v16"/><path d="M16 4v16"/><path d="M6 8h12M6 16h12"/></svg>
-            <span class="nav-text">Marketing</span>
-            <svg class="nav-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m6 9 6 6 6-6"/></svg>
-          </button>
-          <button class="nav-item">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M5 12h.01M12 12h.01M19 12h.01"/></svg>
-            <span class="nav-text">More</span>
-            <svg class="nav-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m6 9 6 6 6-6"/></svg>
-          </button>
-        </nav>
-
-        <nav class="nav-section">
-          <p class="section-label">Apps</p>
-          <button class="nav-item">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></svg>
-            <span class="nav-text">Automations</span>
-          </button>
-          <button class="nav-item">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>
-            <span class="nav-text">Add</span>
-          </button>
-        </nav>
-      </div>
-
-      <div class="sidebar-footer">
-        <button class="nav-item">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m8 9-4 3 4 3"/><path d="m16 9 4 3-4 3"/><path d="m14 5-4 14"/></svg>
-          <span class="nav-text">Developer</span>
-        </button>
-        <button class="nav-item">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V21a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1A2 2 0 1 1 4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H3a2 2 0 0 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.3 7A2 2 0 1 1 7.1 4.2l.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.6V3a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1A2 2 0 1 1 19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.1a2 2 0 0 1 0 4H21a1.7 1.7 0 0 0-1.6 1Z"/></svg>
-          <span class="nav-text">Settings</span>
-        </button>
-      </div>
-    </aside>
-
-    <main class="content">
-      <section class="workspace">
-        <div class="page-head home-page-head">
-          <div>
-            <p class="eyebrow">TOMECO overview</p>
-            <h1>Home dashboard</h1>
-            <p class="page-description">Welcome back, {{ $user->fullName }}. Here is what is happening today.</p>
-          </div>
-          <div class="dashboard-date">{{ now()->format('F d, Y') }}</div>
-        </div>
-
-        <div class="overview-grid">
-          <article class="overview-card overview-card-primary"><div class="overview-icon">U</div><div><p>Total registered users</p><strong>{{ number_format($totalUsers) }}</strong><span>All TOMECO accounts</span></div></article>
-          <article class="overview-card"><div class="overview-icon">+</div><div><p>New users this month</p><strong>{{ number_format($newUsersThisMonth) }}</strong><span>{{ now()->format('F Y') }}</span></div></article>
-          <article class="overview-card"><div class="overview-icon">A</div><div><p>Account status</p><strong>Active</strong><span>System access protected</span></div></article>
-        </div>
-
-        <div class="home-content-grid">
-          <section class="dashboard-panel">
-            <div class="panel-heading"><div><h2>Recently registered</h2><p>Latest accounts added to TOMECO</p></div><a href="{{ route('dashboard.users') }}">View all users</a></div>
-            <div class="recent-list">
-              @forelse ($recentUsers as $recentUser)
-                <div class="recent-user"><span class="table-avatar">{{ strtoupper(substr($recentUser->fullName ?: 'U', 0, 1)) }}</span><span class="recent-details"><strong>{{ $recentUser->fullName ?: 'Unnamed user' }}</strong><small>{{ $recentUser->email }}</small></span><span class="recent-date">{{ $recentUser->created_at?->format('M d, Y') ?? '-' }}</span></div>
-              @empty
-                <div class="home-empty">No registered users yet.</div>
-              @endforelse
-            </div>
-          </section>
-          <aside class="dashboard-panel quick-panel">
-            <div class="panel-heading"><div><h2>Quick actions</h2><p>Common dashboard tasks</p></div></div>
-            <a class="quick-action" href="{{ route('dashboard.users') }}"><span>View users</span><b>&rarr;</b></a>
-            <div class="quick-action is-disabled"><span>Review payments</span><small>Coming soon</small></div>
-            <div class="quick-action is-disabled"><span>View analytics</span><small>Coming soon</small></div>
-          </aside>
-        </div>
-
-        {{-- User management is available on the dedicated dashboard.users page. --}}
-        @if (false)
-        <div class="table-card home-hidden-table">
-          <div class="table-scroll">
-            <table class="users-table">
-              <thead>
-                <tr>
-                  <th scope="col">User</th>
-                  <th scope="col">Badge number</th>
-                  <th scope="col">Phone number</th>
-                  <th scope="col">Joined</th>
-                  <th scope="col">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                @forelse ($users as $listedUser)
-                  @php
-                    $listedName = $listedUser->fullName ?: 'Unnamed user';
-                    $listedInitials = collect(explode(' ', $listedName))
-                      ->filter()->map(fn ($part) => strtoupper(substr($part, 0, 1)))
-                      ->take(2)->join('');
-                  @endphp
-                  <tr>
-                    <td>
-                      <div class="user-cell">
-                        <span class="table-avatar">{{ $listedInitials ?: 'U' }}</span>
-                        <span>
-                          <strong>{{ $listedName }}</strong>
-                          <small>{{ $listedUser->email }}</small>
-                        </span>
-                      </div>
-                    </td>
-                    <td><span class="badge-number">{{ $listedUser->badgeNumber ?: '—' }}</span></td>
-                    <td>{{ $listedUser->phoneNumber ?: '—' }}</td>
-                    <td>{{ $listedUser->created_at?->format('M d, Y') ?? '—' }}</td>
-                    <td><span class="status-badge"><i></i> Registered</span></td>
-                  </tr>
-                @empty
-                  <tr>
-                    <td colspan="5" class="empty-state">
-                      <strong>{{ $search !== '' ? 'No users found' : 'No registered users yet' }}</strong>
-                      <span>{{ $search !== '' ? 'Try a different name, badge, phone number, or email.' : 'Newly registered accounts will appear here.' }}</span>
-                    </td>
-                  </tr>
-                @endforelse
-              </tbody>
-            </table>
-          </div>
-
-          @if ($users->hasPages())
-            <div class="table-footer">
-              <span>Showing {{ $users->firstItem() }}–{{ $users->lastItem() }} of {{ $users->total() }}</span>
-              <div class="pagination-actions">
-                @if ($users->onFirstPage())
-                  <span class="page-button is-disabled">Previous</span>
-                @else
-                  <a class="page-button" href="{{ $users->previousPageUrl() }}">Previous</a>
-                @endif
-                @if ($users->hasMorePages())
-                  <a class="page-button" href="{{ $users->nextPageUrl() }}">Next</a>
-                @else
-                  <span class="page-button is-disabled">Next</span>
-                @endif
-              </div>
-            </div>
-          @endif
-        </div>
-        @endif
-      </section>
-    </main>
+@section('content')
+  <div class="page-head home-page-head">
+    <div><p class="eyebrow">TOMECO overview</p><h1>Home</h1><p class="page-description">Welcome, {{ auth()->user()->fullName }}. Here's what's happening today.</p></div>
+    <div class="dashboard-date">{{ now()->format('F d, Y') }}</div>
   </div>
-</body>
-</html>
+
+  <div class="overview-grid">
+    <article class="overview-card overview-card-primary"><div class="overview-icon">U</div><div><p>Total registered users</p><strong>{{ number_format($totalUsers) }}</strong><span>All TOMECO accounts</span></div></article>
+    <article class="overview-card"><div class="overview-icon">+</div><div><p>New users this month</p><strong>{{ number_format($newUsersThisMonth) }}</strong><span>{{ now()->format('F Y') }}</span></div></article>
+    <article class="overview-card"><div class="overview-icon">A</div><div><p>Account status</p><strong>Active</strong><span>System access protected</span></div></article>
+  </div>
+
+  <div class="home-content-grid">
+    <section class="dashboard-panel">
+      <div class="panel-heading"><div><h2>Recently registered</h2><p>Latest accounts added to TOMECO</p></div><a href="{{ route('dashboard.users') }}">View all users</a></div>
+      <div class="recent-list">
+        @forelse ($recentUsers as $recentUser)
+          <div class="recent-user"><span class="table-avatar">{{ strtoupper(substr($recentUser->fullName ?: 'U', 0, 1)) }}</span><span class="recent-details"><strong>{{ $recentUser->fullName ?: 'Unnamed user' }}</strong><small>{{ $recentUser->email }}</small></span><span class="recent-date">{{ $recentUser->created_at?->format('M d, Y') ?? '-' }}</span></div>
+        @empty
+          <div class="home-empty">No registered users yet.</div>
+        @endforelse
+      </div>
+    </section>
+    <aside class="dashboard-panel quick-panel">
+      <div class="panel-heading"><div><h2>Quick actions</h2><p>Common dashboard tasks</p></div></div>
+      <a class="quick-action" href="{{ route('dashboard.users') }}"><span>View users</span><b>&rarr;</b></a>
+      <div class="quick-action is-disabled"><span>Review payments</span><small>Coming soon</small></div>
+      <div class="quick-action is-disabled"><span>View analytics</span><small>Coming soon</small></div>
+    </aside>
+  </div>
+@endsection

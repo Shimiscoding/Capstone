@@ -184,3 +184,85 @@ body.auth-page {
         flex-direction: column;
     }
 }
+
+.auth-brand-with-logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 22px;
+}
+
+.auth-brand-with-logo img {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    object-fit: cover;
+    box-shadow: 0 6px 18px rgba(127, 29, 29, .14);
+}
+
+.auth-brand-with-logo span {
+    display: grid;
+    gap: 3px;
+}
+
+.auth-brand-with-logo strong {
+    color: #dc2626;
+    font-size: 15px;
+    letter-spacing: .12em;
+}
+
+.auth-brand-with-logo small {
+    color: #71717a;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+}
+
+.password-field {
+    position: relative;
+}
+
+.password-field .auth-input {
+    padding-right: 68px;
+}
+
+.password-toggle {
+    position: absolute;
+    top: 50%;
+    right: 10px;
+    display: grid;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    place-items: center;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    color: #dc2626;
+    cursor: pointer;
+    transform: translateY(-50%);
+}
+
+.password-toggle svg {
+    width: 19px;
+    height: 19px;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.8;
+}
+
+.password-toggle svg[hidden] {
+    display: none;
+}
+
+.password-toggle:hover {
+    background: #fef2f2;
+}
+
+.password-toggle:focus-visible {
+    outline: 2px solid #f87171;
+    outline-offset: 1px;
+}
