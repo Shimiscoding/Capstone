@@ -50,15 +50,14 @@
           <a class="nav-item {{ $activePage === 'dashboard' ? 'is-active' : '' }}" href="{{ route('dashboard') }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10.5V20h5v-6h4v6h5v-9.5"/></svg><span class="nav-text">Home   </span></a>
           <button class="nav-item" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 19V5"/><path d="m7 15 4-4 3 3 5-6"/></svg><span class="nav-text">Analytics</span></button>
           <a class="nav-item {{ $activePage === 'payments' ? 'is-active' : '' }}" href="{{ route('dashboard.payments') }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18"/></svg><span class="nav-text">Payments</span></a>
-          <a class="nav-item {{ $activePage === 'users' ? 'is-active' : '' }}" href="{{ route('dashboard.users') }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/></svg><span class="nav-text">Users</span></a>
-          <button class="nav-item" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 10h16"/><path d="M5 10 12 4l7 6"/><path d="M6 10v8M10 10v8M14 10v8M18 10v8"/><path d="M3 18h18"/></svg><span class="nav-text">Balances</span></button>
-          <button class="nav-item" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg><span class="nav-text">Support chats</span></button>
+          <a class="nav-item {{ $activePage === 'impounding' ? 'is-active' : '' }}" href="{{ route('dashboard.impounding') }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="4" y="5" width="16" height="14" rx="3"/><path d="m8 9 4 3 4-3"/></svg><span class="nav-text">Impounded Vehicles</span></a>
+          <button class="nav-item" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 10h16"/><path d="M5 10 12 4l7 6"/><path d="M6 10v8M10 10v8M14 10v8M18 10v8"/><path d="M3 18h18"/></svg><span class="nav-text">Summon</span></button>
         </nav>
         <nav class="nav-section">
           <p class="section-label">Pinned</p>
-          <a class="nav-item {{ $activePage === 'impounding' ? 'is-active' : '' }}" href="{{ route('dashboard.impounding') }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="4" y="5" width="16" height="14" rx="3"/><path d="m8 9 4 3 4-3"/></svg><span class="nav-text">Impounded Vehicles</span></a>
-          <button class="nav-item" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1-1"/></svg><span class="nav-text">Checkout links</span></button>
-          <button class="nav-item" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M7 3h10l2 2v16l-3-2-3 2-3-2-3 2-2-1V5Z"/><path d="M9 8h6M9 12h6M9 16h4"/></svg><span class="nav-text">Summon</span></button>
+          <button class="nav-item" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg><span class="nav-text">Support chats</span></button>
+          <a class="nav-item {{ $activePage === 'users' ? 'is-active' : '' }}" href="{{ route('dashboard.users') }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/></svg><span class="nav-text">Users</span></a>
+          <button class="nav-item" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M7 3h10l2 2v16l-3-2-3 2-3-2-3 2-2-1V5Z"/><path d="M9 8h6M9 12h6M9 16h4"/></svg><span class="nav-text">Summon Form</span></button>
         </nav>
         <nav class="nav-section">
           <p class="section-label">All tools</p>
@@ -73,11 +72,11 @@
       </div>
       <div class="sidebar-footer">
         <button class="nav-item" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m8 9-4 3 4 3M16 9l4 3-4 3M14 5l-4 14"/></svg><span class="nav-text">Developer</span></button>
-        <button class="nav-item" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V21a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1A2 2 0 1 1 4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14a2 2 0 0 1 0-4 1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9A2 2 0 1 1 7.1 4.2a1.7 1.7 0 0 0 1.9.3A1.7 1.7 0 0 0 10 3a2 2 0 0 1 4 0 1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3A2 2 0 1 1 19.8 7a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1 2 2 0 0 1 0 4 1.7 1.7 0 0 0-1.7 1Z"/></svg><span class="nav-text">Settings</span></button>
+        @if ($user->isAdmin())<a class="nav-item {{ $activePage === 'settings' ? 'is-active' : '' }}" href="{{ route('dashboard.settings') }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V21a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1A2 2 0 1 1 4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14a2 2 0 0 1 0-4 1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9A2 2 0 1 1 7.1 4.2a1.7 1.7 0 0 0 1.9.3A1.7 1.7 0 0 0 10 3a2 2 0 0 1 4 0 1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3A2 2 0 1 1 19.8 7a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1 2 2 0 0 1 0 4 1.7 1.7 0 0 0-1.7 1Z"/></svg><span class="nav-text">Settings</span></a>@endif
       </div>
     </aside>
 
-    <main class="content"><section class="workspace">@yield('content')</section></main>
+    <main class="content"><section class="workspace">@if(app(\App\Services\Settings::class)->get('maintenance.enabled', false))<div class="payment-alert is-error">Scheduled maintenance is enabled. Administrative access remains available.</div>@endif @yield('content')</section></main>
   </div>
   <script>
     (() => {

@@ -16,9 +16,12 @@
     </div>
     <div class="notification-list">
       @forelse ($dashboardNotifications as $notification)
-        <a class="notification-item {{ $notification->read_at ? '' : 'is-unread' }}" href="{{ $notification->data['url'] ?? route('dashboard') }}">
-          <i></i><span><strong>{{ $notification->data['title'] ?? 'Notification' }}</strong><small>{{ $notification->data['message'] ?? '' }}</small><time>{{ $notification->created_at->diffForHumans() }}</time></span>
-        </a>
+        <form method="POST" action="{{ route('dashboard.notifications.read-one', $notification->id) }}">
+          @csrf
+          <button class="notification-item {{ $notification->read_at ? '' : 'is-unread' }}" type="submit">
+            <i></i><span><strong>{{ $notification->data['title'] ?? 'Notification' }}</strong><small>{{ $notification->data['message'] ?? '' }}</small><time>{{ $notification->created_at->diffForHumans() }}</time></span>
+          </button>
+        </form>
       @empty
         <div class="notification-empty">You have no notifications yet.</div>
       @endforelse

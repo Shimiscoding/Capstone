@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Notifications\UserActivityNotification;
+use App\Notifications\UserCreatedNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -32,7 +34,7 @@ class UserManagementTest extends TestCase
         ]);
         $this->assertDatabaseHas('notifications', [
             'notifiable_id' => $admin->id,
-            'type' => \App\Notifications\UserCreatedNotification::class,
+            'type' => UserCreatedNotification::class,
         ]);
         $this->assertDatabaseHas('notifications', [
             'notifiable_id' => $admin->id,
@@ -43,7 +45,7 @@ class UserManagementTest extends TestCase
     public function test_admin_can_mark_all_notifications_as_read(): void
     {
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
-        $admin->notify(new \App\Notifications\UserCreatedNotification(
+        $admin->notify(new UserCreatedNotification(
             User::factory()->create(['role' => User::ROLE_DRIVER, 'badgeNumber' => null])
         ));
 
@@ -52,6 +54,37 @@ class UserManagementTest extends TestCase
             ->assertRedirect();
 
         $this->assertSame(0, $admin->fresh()->unreadNotifications()->count());
+    }
+
+    public function test_selecting_a_notification_marks_only_that_notification_as_read(): void
+    {
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $admin->notify(new UserCreatedNotification(
+            User::factory()->create(['role' => User::ROLE_DRIVER, 'badgeNumber' => null])
+        ));
+        $selectedNotification = $admin->fresh()->unreadNotifications()->first();
+
+        $this->actingAs($admin)
+            ->post(route('dashboard.notifications.read-one', $selectedNotification->id))
+            ->assertRedirect($selectedNotification->data['url']);
+
+        $this->assertNotNull($selectedNotification->fresh()->read_at);
+    }
+
+    public function test_user_cannot_mark_another_users_notification_as_read(): void
+    {
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $otherAdmin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $otherAdmin->notify(new UserCreatedNotification(
+            User::factory()->create(['role' => User::ROLE_DRIVER, 'badgeNumber' => null])
+        ));
+        $notification = $otherAdmin->fresh()->unreadNotifications()->first();
+
+        $this->actingAs($admin)
+            ->post(route('dashboard.notifications.read-one', $notification->id))
+            ->assertNotFound();
+
+        $this->assertNull($notification->fresh()->read_at);
     }
 
     public function test_non_admin_cannot_manage_users(): void
@@ -107,7 +140,7 @@ class UserManagementTest extends TestCase
         ]);
         $this->assertDatabaseHas('notifications', [
             'notifiable_id' => $admin->id,
-            'type' => \App\Notifications\UserActivityNotification::class,
+            'type' => UserActivityNotification::class,
         ]);
     }
 
@@ -122,7 +155,7 @@ class UserManagementTest extends TestCase
         $this->assertDatabaseMissing('users', ['id' => $user->id]);
         $this->assertDatabaseHas('notifications', [
             'notifiable_id' => $admin->id,
-            'type' => \App\Notifications\UserActivityNotification::class,
+            'type' => UserActivityNotification::class,
         ]);
 
         $this->actingAs($admin)

@@ -2,33 +2,122 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ImpoundedVehicle;
+use App\Models\Payment;
 use App\Models\User;
+use App\Models\Violation;
 use App\Notifications\UserActivityNotification;
 use App\Notifications\UserCreatedNotification;
+use App\Services\ImpoundedVehicleImporter;
+use App\Services\Settings;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\Rule;
 
 class DashboardController extends Controller
 {
-    public function payments(): View
+    public function payments(Request $request, Settings $settings): View
     {
-        return view('dashboard.payment');
+        abort_unless($settings->allows($request->user(), 'view_payments'), 403);
+        $isDriver = $request->user()->role === User::ROLE_DRIVER;
+        $paymentQuery = Payment::query()
+            ->with(['violation', 'user'])
+            ->when($isDriver, fn ($query) => $query->where('user_id', $request->user()->id));
+        $violationQuery = Violation::query()
+            ->when($isDriver, fn ($query) => $query->where('plate_number', $request->user()->plateNumber));
+
+        $paid = (clone $paymentQuery)->where('status', 'paid');
+        $pending = (clone $paymentQuery)->where('status', 'pending');
+        $dailyCollections = collect(range(6, 0))->map(function (int $daysAgo) use ($paymentQuery): array {
+            $day = now()->subDays($daysAgo);
+
+            return [
+                'label' => $day->format('D'),
+                'amount' => (clone $paymentQuery)->where('status', 'paid')->whereDate('paid_at', $day)->sum('amount'),
+            ];
+        });
+        $maxDaily = max(1, (int) $dailyCollections->max('amount'));
+
+        return view('dashboard.payment', [
+            'transactions' => (clone $paymentQuery)->latest()->take(20)->get(),
+            'unpaidViolations' => (clone $violationQuery)->where('status', '!=', 'paid')->latest()->get(),
+            'totalCollected' => (clone $paid)->sum('amount'),
+            'successfulCount' => (clone $paid)->count(),
+            'pendingCount' => (clone $pending)->count(),
+            'pendingAmount' => (clone $pending)->sum('amount'),
+            'failedCount' => (clone $paymentQuery)->where('status', 'failed')->count(),
+            'dailyCollections' => $dailyCollections,
+            'maxDaily' => $maxDaily,
+        ]);
     }
 
     public function impounding(): View
     {
-        $vehicles = collect([
-            ['reference' => 'IMP-2026-0042', 'owner' => 'Juan Dela Cruz', 'vehicle' => 'Honda Click 125i', 'plate' => '123 ABC', 'violation' => 'Illegal parking', 'date' => 'Jul 20, 2026', 'location' => 'Main Yard', 'status' => 'Impounded'],
-            ['reference' => 'IMP-2026-0041', 'owner' => 'Maria Santos', 'vehicle' => 'Toyota Vios', 'plate' => 'NCR 4821', 'violation' => 'Road obstruction', 'date' => 'Jul 19, 2026', 'location' => 'Main Yard', 'status' => 'For release'],
-            ['reference' => 'IMP-2026-0040', 'owner' => 'Carlo Reyes', 'vehicle' => 'Yamaha Mio i125', 'plate' => '456 DEF', 'violation' => 'No parking zone', 'date' => 'Jul 18, 2026', 'location' => 'Satellite Yard A', 'status' => 'Released'],
-            ['reference' => 'IMP-2026-0039', 'owner' => 'Angela Lim', 'vehicle' => 'Mitsubishi Mirage', 'plate' => 'ABC 9087', 'violation' => 'Abandoned vehicle', 'date' => 'Jul 17, 2026', 'location' => 'Main Yard', 'status' => 'Impounded'],
-            ['reference' => 'IMP-2026-0038', 'owner' => 'Miguel Garcia', 'vehicle' => 'Suzuki Raider 150', 'plate' => '789 GHI', 'violation' => 'Traffic obstruction', 'date' => 'Jul 16, 2026', 'location' => 'Satellite Yard B', 'status' => 'Released'],
+        $vehicles = ImpoundedVehicle::latest('impounded_at')->get();
+
+        return view('dashboard.impounding', [
+            'vehicles' => $vehicles,
+            'vehicleTypes' => ImpoundedVehicle::query()->distinct()->orderBy('type')->pluck('type'),
+            'availableYears' => ImpoundedVehicle::query()->selectRaw('YEAR(impounded_at) as year')->distinct()->orderBy('year')->pluck('year'),
+        ]);
+    }
+
+    public function exportImpounding(Request $request, Settings $settings): Response
+    {
+        abort_unless($settings->allows($request->user(), 'export'), 403);
+        $filters = $request->validate([
+            'vehicle_type' => ['nullable', 'string', Rule::in(['Car', 'Motorcycle'])],
+            'year_from' => ['required', 'integer', 'between:2000,2100'],
+            'year_to' => ['required', 'integer', 'between:2000,2100', 'gte:year_from'],
         ]);
 
-        return view('dashboard.impounding', compact('vehicles'));
+        $vehicles = ImpoundedVehicle::query()
+            ->when($filters['vehicle_type'] ?? null, fn ($query, $type) => $query->where('type', $type))
+            ->whereYear('impounded_at', '>=', $filters['year_from'])
+            ->whereYear('impounded_at', '<=', $filters['year_to'])
+            ->orderByDesc('impounded_at')
+            ->get();
+        $filename = 'impounded-vehicles-'.$filters['year_from'].'-'.$filters['year_to'].'.xls';
+
+        return response(view('dashboard.exports.impounded-vehicles', compact('vehicles', 'filters'))->render(), 200, [
+            'Content-Type' => 'application/vnd.ms-excel; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+            'Cache-Control' => 'max-age=0, no-cache, no-store, must-revalidate',
+        ]);
+    }
+
+    public function importImpounding(Request $request, ImpoundedVehicleImporter $importer, Settings $settings): RedirectResponse
+    {
+        abort_unless($settings->allows($request->user(), 'import'), 403);
+        $request->validate([
+            'excel_file' => [
+                'required',
+                'file',
+                'max:'.((int) $settings->get('data.max_upload_mb', 5) * 1024),
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    if (! in_array(strtolower($value->getClientOriginalExtension()), ['xlsx', 'xls', 'csv'], true)) {
+                        $fail('The Excel file must have an .xlsx, .xls, or .csv extension.');
+                    }
+                },
+            ],
+        ]);
+
+        try {
+            $result = $importer->import($request->file('excel_file'));
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            return to_route('dashboard.impounding')->with('error', 'Import failed: '.$exception->getMessage());
+        }
+
+        $message = "Import complete: {$result['imported']} added and {$result['updated']} updated.";
+
+        return to_route('dashboard.impounding')
+            ->with('success', $message)
+            ->with('import_errors', $result['errors']);
     }
 
     public function index(): View
@@ -85,7 +174,7 @@ class DashboardController extends Controller
             'phoneNumber' => ['required', 'string', 'max:30', 'unique:users,phoneNumber'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'role' => ['required', Rule::in(User::ROLES)],
-            'password' => ['required', 'confirmed', 'min:8'],
+            'password' => ['required', 'confirmed', 'min:'.app(Settings::class)->get('security.password_min_length', 8)],
         ]);
 
         $attributes['badgeNumber'] = $attributes['role'] === User::ROLE_DRIVER ? null : $attributes['badgeNumber'];
@@ -115,7 +204,7 @@ class DashboardController extends Controller
             'phoneNumber' => ['required', 'string', 'max:30', Rule::unique('users', 'phoneNumber')->ignore($user)],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user)],
             'role' => ['required', Rule::in(User::ROLES)],
-            'password' => ['nullable', 'confirmed', 'min:8'],
+            'password' => ['nullable', 'confirmed', 'min:'.app(Settings::class)->get('security.password_min_length', 8)],
         ]);
 
         $attributes['badgeNumber'] = $attributes['role'] === User::ROLE_DRIVER ? null : $attributes['badgeNumber'];
@@ -159,6 +248,14 @@ class DashboardController extends Controller
         $request->user()->unreadNotifications->markAsRead();
 
         return back()->with('success', 'Notifications marked as read.');
+    }
+
+    public function markNotificationRead(Request $request, string $notification): RedirectResponse
+    {
+        $notification = $request->user()->notifications()->findOrFail($notification);
+        $notification->markAsRead();
+
+        return redirect()->to($notification->data['url'] ?? route('dashboard'));
     }
 
     private function ensureAdmin(Request $request): void
