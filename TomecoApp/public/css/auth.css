@@ -10,11 +10,33 @@ body.auth-page {
     font-family: Arial, Helvetica, sans-serif;
 }
 
+body.auth-page.login-page {
+    background-image: url('../images/TomecoLogin.jpg');
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: cover;
+    background-attachment: fixed;
+}
+
 .auth-shell {
     display: grid;
     min-height: 100vh;
     place-items: center;
     padding: 40px 16px;
+}
+
+.login-page .auth-shell {
+    place-items: center;
+    padding: 32px 16px;
+}
+
+.login-page .auth-card {
+    width: min(100%, 440px);
+    min-height: auto;
+    padding: 28px;
+    border: 1px solid rgba(254, 226, 226, .8);
+    border-radius: 12px;
+    box-shadow: 0 24px 70px rgba(24, 24, 27, .24);
 }
 
 .auth-card {
@@ -23,7 +45,9 @@ body.auth-page {
     padding: 28px;
     border: 1px solid #fee2e2;
     border-radius: 8px;
-    background: #ffffff;
+    background: rgba(255, 255, 255, .75);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
     box-shadow: 0 24px 70px rgba(127, 29, 29, .12);
 }
 
@@ -99,11 +123,56 @@ body.auth-page {
     font-size: 14px;
 }
 
+.auth-status {
+    margin: -14px 0 22px;
+    padding: 12px;
+    border: 1px solid #bbf7d0;
+    border-radius: 6px;
+    background: #f0fdf4;
+    color: #166534;
+    font-size: 14px;
+}
+
+.auth-forgot-link {
+    justify-self: end;
+    margin-top: -10px;
+    font-size: 14px;
+}
+
 .auth-note {
     margin: 24px 0 0;
     text-align: center;
     color: #71717a;
     font-size: 14px;
+}
+
+.auth-description {
+    margin: -16px 0 24px;
+    color: #52525b;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.auth-otp-input {
+    text-align: center;
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: .35em;
+}
+
+.auth-text-button {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #dc2626;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.auth-support-note {
+    margin-top: 10px;
+    font-size: 13px;
 }
 
 .auth-link {
@@ -179,6 +248,19 @@ body.auth-page {
 }
 
 @media (max-width: 640px) {
+    .login-page .auth-shell {
+        justify-items: center;
+        padding: 16px;
+    }
+
+    .login-page .auth-card {
+        width: 100%;
+        min-height: auto;
+        padding: 28px;
+        border: 1px solid #fee2e2;
+        border-radius: 8px;
+    }
+
     .dashboard-header {
         align-items: flex-start;
         flex-direction: column;

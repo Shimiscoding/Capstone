@@ -13,6 +13,25 @@ class PayMongoPaymentTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_violation_is_connected_to_driver_with_matching_plate_number(): void
+    {
+        $driver = User::factory()->create([
+            'role' => User::ROLE_DRIVER,
+            'plateNumber' => 'ABC 123',
+        ]);
+
+        $violation = Violation::create([
+            'driver_name' => $driver->fullName,
+            'plate_number' => ' abc 123 ',
+            'violation_type' => 'Illegal parking',
+            'fine_amount' => 500,
+        ]);
+
+        $this->assertSame($driver->id, $violation->user_id);
+        $this->assertTrue($violation->user->is($driver));
+        $this->assertTrue($driver->violations()->whereKey($violation)->exists());
+    }
+
     public function test_driver_can_create_checkout_for_own_violation(): void
     {
         config()->set('services.paymongo.secret_key', 'sk_test_example');

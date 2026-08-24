@@ -26,7 +26,6 @@ class UserFactory extends Factory
     {
         return [
             'fullName' => fake()->name(),
-            'badgeNumber' => fake()->unique()->numerify('BDG-######'),
             'phoneNumber' => fake()->unique()->numerify('09#########'),
             'email' => fake()->unique()->safeEmail(),
             'email_verified_at' => now(),

@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Models\ImpoundedVehicle;
+use App\Models\Violation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -41,18 +43,20 @@ class ExampleTest extends TestCase
     public function test_users_can_register(): void
     {
         $this->post('/register', [
-            'fullName' => 'New User',
-            'badgeNumber' => 'BDG-100001',
+            'firstName' => 'New',
+            'middleName' => null,
+            'lastName' => 'User',
+            'nameExtension' => null,
             'phoneNumber' => '09170000001',
             'email' => 'new@example.com',
             'password' => 'password',
             'password_confirmation' => 'password',
-        ])->assertRedirect(route('dashboard'));
+        ])->assertRedirect(route('verification.notice'));
 
         $this->assertAuthenticated();
         $this->assertDatabaseHas('users', [
-            'fullName' => 'New User',
-            'badgeNumber' => 'BDG-100001',
+            'firstName' => 'New',
+            'lastName' => 'User',
             'phoneNumber' => '09170000001',
             'email' => 'new@example.com',
         ]);
@@ -72,6 +76,35 @@ class ExampleTest extends TestCase
             ->assertSee('dashboard@example.com');
     }
 
+    public function test_dashboard_shows_ticket_and_impound_context(): void
+    {
+        $user = User::factory()->create();
+        Violation::create([
+            'driver_name' => 'Juan Dela Cruz',
+            'plate_number' => 'ABC 123',
+            'violation_type' => 'Illegal parking',
+            'fine_amount' => 500,
+        ]);
+        ImpoundedVehicle::create([
+            'reference' => 'IMP-HOME-001',
+            'owner' => 'Juan Dela Cruz',
+            'vehicle' => 'Honda Civic',
+            'type' => 'Car',
+            'plate' => 'ABC 123',
+            'violation' => 'Illegal parking',
+            'impounded_at' => now(),
+            'location' => 'Main Yard',
+            'status' => 'Impounded',
+        ]);
+
+        $this->actingAs($user)->get(route('dashboard'))
+            ->assertOk()
+            ->assertSee('Tickets issued')
+            ->assertSee('Illegal parking')
+            ->assertSee('Vehicles currently impounded')
+            ->assertSee('ABC 123');
+    }
+
     public function test_users_can_log_in_and_log_out(): void
     {
         $user = User::factory()->create([
@@ -89,5 +122,20 @@ class ExampleTest extends TestCase
         $this->post('/logout')->assertRedirect(route('login'));
 
         $this->assertGuest();
+    }
+
+    public function test_users_can_log_in_with_their_username(): void
+    {
+        $user = User::factory()->create([
+            'username' => 'tomeco.admin',
+            'password' => 'password',
+        ]);
+
+        $this->post('/login', [
+            'login' => 'tomeco.admin',
+            'password' => 'password',
+        ])->assertRedirect(route('dashboard'));
+
+        $this->assertAuthenticatedAs($user);
     }
 }

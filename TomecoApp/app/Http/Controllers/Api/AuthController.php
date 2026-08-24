@@ -24,9 +24,9 @@ class AuthController extends Controller
             ],
         ]);
 
-        // Find user using email or badge number.
+        // Find user using username or email.
         $user = User::where('email', $validated['login'])
-            ->orWhere('badgeNumber', $validated['login'])
+            ->orWhere('username', $validated['login'])
             ->first();
 
         // Check whether the account and password are correct.
@@ -36,7 +36,7 @@ class AuthController extends Controller
         ) {
             throw ValidationException::withMessages([
                 'login' => [
-                    'Invalid email, badge number, or password.',
+                    'Invalid username, email, or password.',
                 ],
             ]);
         }
@@ -66,12 +66,17 @@ class AuthController extends Controller
             'user' => [
                 'id' => $user->id,
                 'fullName' => $user->fullName,
-                'badgeNumber' => $user->badgeNumber,
+                'firstName' => $user->firstName,
+                'middleName' => $user->middleName,
+                'lastName' => $user->lastName,
+                'nameExtension' => $user->nameExtension,
                 'phoneNumber' => $user->phoneNumber,
                 'driverLicense' => $user->driverLicense,
+                'plateNumber' => $user->plateNumber,
                 'email' => $user->email,
                 'role' => $user->role,
             ],
         ]);
     }
 }
+    

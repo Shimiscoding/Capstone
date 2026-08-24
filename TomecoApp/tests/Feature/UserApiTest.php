@@ -13,7 +13,7 @@ class UserApiTest extends TestCase
 
     public function test_users_can_be_listed_and_shown(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['middleName' => null, 'nameExtension' => null]);
 
         $this->getJson('/api/users')
             ->assertOk()
@@ -31,8 +31,8 @@ class UserApiTest extends TestCase
     public function test_a_user_can_be_created(): void
     {
         $response = $this->postJson('/api/users', [
-            'fullName' => 'API User',
-            'badgeNumber' => 'BDG-200001',
+            'firstName' => 'API',
+            'lastName' => 'User',
             'plateNumber' => 'API-2001',
             'phoneNumber' => '09170000002',
             'email' => 'api-user@example.com',
@@ -56,11 +56,11 @@ class UserApiTest extends TestCase
 
     public function test_a_user_can_be_updated_and_deleted(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['middleName' => null, 'nameExtension' => null]);
 
         $this->putJson("/api/users/{$user->id}", [
-            'fullName' => 'Updated User',
-            'badgeNumber' => 'BDG-200002',
+            'firstName' => 'Updated',
+            'lastName' => 'User',
             'phoneNumber' => '09170000003',
             'email' => 'updated-user@example.com',
         ])
@@ -71,7 +71,6 @@ class UserApiTest extends TestCase
 
         $this->assertDatabaseHas('users', [
             'id' => $user->id,
-            'badgeNumber' => 'BDG-200002',
             'phoneNumber' => '09170000003',
             'email' => 'updated-user@example.com',
         ]);

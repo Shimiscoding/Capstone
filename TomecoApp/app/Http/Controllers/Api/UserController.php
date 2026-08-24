@@ -22,8 +22,11 @@ class UserController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'fullName' => ['required', 'string', 'max:255'],
-            'phoneNumber' => ['required', 'string', 'max:30', 'unique:users,phoneNumber'],
+            'firstName' => ['required_without:fullName', 'string', 'max:100'],
+            'middleName' => ['nullable', 'string', 'max:100'],
+            'lastName' => ['required_without:fullName', 'string', 'max:100'],
+            'nameExtension' => ['nullable', 'string', 'max:20'],
+            'phoneNumber' => ['required', 'string', 'regex:/^09\d{9}$/', 'unique:users,phoneNumber'],
             'driverLicense' => ['nullable', 'string', 'max:255', 'unique:users,driverLicense'],
             'plateNumber' => ['required', 'string', 'max:50', 'unique:users,plateNumber'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
@@ -33,7 +36,6 @@ class UserController extends Controller
         // Public/mobile registration is exclusively for driver accounts.
         // Never trust a role supplied by the client.
         $validated['role'] = User::ROLE_DRIVER;
-        $validated['badgeNumber'] = null;
 
         $user = User::create($validated);
 
@@ -57,10 +59,12 @@ class UserController extends Controller
         $resultingRole = $request->input('role', $user->role);
 
         $validated = $request->validate([
-            'fullName' => ['sometimes', 'required', 'string', 'max:255'],
-            'badgeNumber' => [Rule::excludeIf($resultingRole === User::ROLE_DRIVER), Rule::requiredIf($resultingRole !== User::ROLE_DRIVER), 'nullable', 'string', 'max:50', Rule::unique('users', 'badgeNumber')->ignore($user)],
+            'firstName' => ['sometimes', 'required', 'string', 'max:100'],
+            'middleName' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'lastName' => ['sometimes', 'required', 'string', 'max:100'],
+            'nameExtension' => ['sometimes', 'nullable', 'string', 'max:20'],
             'plateNumber' => [Rule::excludeIf($resultingRole !== User::ROLE_DRIVER), Rule::requiredIf($resultingRole === User::ROLE_DRIVER && blank($user->plateNumber)), 'string', 'max:50', Rule::unique('users', 'plateNumber')->ignore($user)],
-            'phoneNumber' => ['sometimes', 'required', 'string', 'max:30', Rule::unique('users', 'phoneNumber')->ignore($user)],
+            'phoneNumber' => ['sometimes', 'required', 'string', 'regex:/^09\d{9}$/', Rule::unique('users', 'phoneNumber')->ignore($user)],
             'driverLicense' => ['sometimes', 'nullable', 'string', 'max:255', Rule::unique('users', 'driverLicense')->ignore($user)],
             'email' => ['sometimes', 'required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user)],
             'role' => ['sometimes', Rule::in(User::ROLES)],
@@ -68,7 +72,6 @@ class UserController extends Controller
         ]);
 
         if ($resultingRole === User::ROLE_DRIVER) {
-            $validated['badgeNumber'] = null;
         } else {
             $validated['plateNumber'] = null;
         }

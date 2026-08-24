@@ -14,6 +14,28 @@ class ImpoundedVehicleExportTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_imported_vehicle_is_connected_to_driver_with_matching_plate_number(): void
+    {
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $driver = User::factory()->create([
+            'role' => User::ROLE_DRIVER,
+            'plateNumber' => 'ABC 1000',
+        ]);
+        $html = '<table><tr><th>Reference</th><th>Owner</th><th>Vehicle</th><th>Type</th><th>Plate Number</th><th>Violation</th><th>Date Impounded</th><th>Location</th><th>Status</th></tr>'
+            .'<tr><td>IMP-LINK-001</td><td>Test Driver</td><td>Honda Civic</td><td>Car</td><td> abc 1000 </td><td>Illegal parking</td><td>2026-07-22</td><td>Main Yard</td><td>Impounded</td></tr></table>';
+
+        $response = $this->actingAs($admin)->post(route('dashboard.impounding.import'), [
+            'excel_file' => UploadedFile::fake()->createWithContent('vehicles.xls', $html),
+        ]);
+
+        $response->assertRedirect(route('dashboard.impounding'))->assertSessionHas('success');
+        $this->assertDatabaseHas('impounded_vehicles', [
+            'reference' => 'IMP-LINK-001',
+            'user_id' => $driver->id,
+        ]);
+        $this->assertTrue($driver->impoundedVehicles()->where('reference', 'IMP-LINK-001')->exists());
+    }
+
     public function test_authenticated_user_can_export_filtered_impounded_vehicles_to_excel(): void
     {
         $user = User::factory()->create(['role' => User::ROLE_ADMIN]);
@@ -66,8 +88,12 @@ class ImpoundedVehicleExportTest extends TestCase
 
         $response->assertRedirect(route('dashboard.impounding'))->assertSessionHas('success');
         $this->assertDatabaseHas('impounded_vehicles', [
-            'reference' => 'IMP-2026-0100', 'owner' => 'Ana Reyes', 'plate' => 'ABC 1000',
+            'reference' => 'IMP-2026-0100', 'plate' => 'ABC 1000',
         ]);
+        $this->assertSame(
+            'Ana Reyes',
+            ImpoundedVehicle::where('reference', 'IMP-2026-0100')->firstOrFail()->owner,
+        );
     }
 
     public function test_exported_html_xls_file_can_be_imported(): void
@@ -82,7 +108,11 @@ class ImpoundedVehicleExportTest extends TestCase
 
         $response->assertRedirect(route('dashboard.impounding'))->assertSessionHas('success');
         $this->assertDatabaseHas('impounded_vehicles', [
-            'reference' => 'IMP-2026-0200', 'owner' => 'Ben Cruz',
+            'reference' => 'IMP-2026-0200',
         ]);
+        $this->assertSame(
+            'Ben Cruz',
+            ImpoundedVehicle::where('reference', 'IMP-2026-0200')->firstOrFail()->owner,
+        );
     }
 }

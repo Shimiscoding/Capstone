@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\ImpoundedVehicle;
+use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Validator;
@@ -61,6 +62,10 @@ class ImpoundedVehicleImporter
 
             $attributes = $validator->validated();
             $attributes['impounded_at'] = $attributes['date_impounded'];
+            $attributes['user_id'] = User::query()
+                ->where('role', User::ROLE_DRIVER)
+                ->whereRaw('LOWER(TRIM(plateNumber)) = ?', [Str::lower(trim($attributes['plate']))])
+                ->value('id');
             unset($attributes['date_impounded']);
             $record = ImpoundedVehicle::firstOrNew(['reference' => $attributes['reference']]);
             if ($record->exists && $this->settings->get('data.duplicate_behavior') === 'skip') {

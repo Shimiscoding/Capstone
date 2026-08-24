@@ -7,25 +7,29 @@
     <link rel="stylesheet" href="{{ asset('css/auth.css') }}">
     <link rel="icon" href="{{ asset('images/favicon.ico') }}">
 </head>
-<body class="auth-page">
+<body class="auth-page login-page">
     <main class="auth-shell">
         <section class="auth-card">
             <div class="auth-brand auth-brand-with-logo">
                 <img src="{{ asset('images/Tomeco_icon.jpg') }}" alt="TOMECO official seal">
                 <span>
                     <strong>TOMECO</strong>
-                    <small>Service with honor</small>
+                    <small>Traffic Operation Management Enforcement and Control Office Tacloban</small>
                 </span>
             </div>
             <h1 class="auth-title">Log in to your account</h1>
+
+            @if (session('status'))
+                <p class="auth-status" role="status">{{ session('status') }}</p>
+            @endif
 
             <form method="POST" action="{{ route('login.store') }}" class="auth-form">
                 @csrf
 
                 <div>
-                    <label for="email" class="auth-label">Email</label>
-                    <input id="email" name="email" type="email" value="{{ old('email') }}" autocomplete="email" required autofocus class="auth-input">
-                    @error('email')
+                    <label for="login" class="auth-label">Username or email</label>
+                    <input id="login" name="login" type="text" value="{{ old('login', old('email')) }}" autocomplete="username" required autofocus class="auth-input">
+                    @error('login')
                         <p class="auth-error">{{ $message }}</p>
                     @enderror
                 </div>
@@ -49,12 +53,13 @@
                     Remember me
                 </label>
 
+                <a href="{{ route('password.request') }}" class="auth-link auth-forgot-link">Forgot your password?</a>
+
                 <button type="submit" class="auth-button">Log in</button>
             </form>
 
-            <p class="auth-note">
-                No account yet?
-                <a href="{{ route('register') }}" class="auth-link">Create one</a>
+            <p class="auth-note auth-support-note">
+                Having trouble accessing your account? Contact the administrator.
             </p>
         </section>
     </main>

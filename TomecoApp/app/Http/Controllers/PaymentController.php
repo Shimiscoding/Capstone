@@ -131,7 +131,7 @@ class PaymentController extends Controller
     {
         abort_unless(
             in_array($request->user()->role, [User::ROLE_ADMIN, User::ROLE_OFFICER], true)
-            || strcasecmp((string) $request->user()->plateNumber, $violation->plate_number) === 0,
+            || $violation->user_id === $request->user()->id,
             403,
         );
     }
