@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('violations', function (Blueprint $table) {
             $table->id();
-            $table->string('driver_name');
+            $table->string('motorist_name');
             $table->string('license_number')->nullable();
             $table->string('plate_number');
             $table->string('violation_type');

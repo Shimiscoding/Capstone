@@ -18,19 +18,18 @@ class UserManagementTest extends TestCase
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
 
         $response = $this->actingAs($admin)->post(route('dashboard.users.store'), [
-            'fullName' => 'Driver One',
-            'plateNumber' => 'ABC-1234',
+            'fullName' => 'Enforcer One',
             'phoneNumber' => '09171234567',
-            'email' => 'driver@example.com',
-            'role' => User::ROLE_DRIVER,
+            'email' => 'enforcer-one@example.com',
+            'role' => User::ROLE_OFFICER,
             'password' => 'password123',
             'password_confirmation' => 'password123',
         ]);
 
         $response->assertRedirect(route('dashboard.users'));
         $this->assertDatabaseHas('users', [
-            'email' => 'driver@example.com',
-            'role' => User::ROLE_DRIVER,
+            'email' => 'enforcer-one@example.com',
+            'role' => User::ROLE_OFFICER,
         ]);
         $this->assertDatabaseHas('notifications', [
             'notifiable_id' => $admin->id,
@@ -46,7 +45,7 @@ class UserManagementTest extends TestCase
     {
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
         $admin->notify(new UserCreatedNotification(
-            User::factory()->create(['role' => User::ROLE_DRIVER])
+            User::factory()->create(['role' => User::ROLE_OFFICER])
         ));
 
         $this->actingAs($admin)
@@ -61,7 +60,7 @@ class UserManagementTest extends TestCase
     {
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
         $admin->notify(new UserCreatedNotification(
-            User::factory()->create(['role' => User::ROLE_DRIVER])
+            User::factory()->create(['role' => User::ROLE_OFFICER])
         ));
         $selectedNotification = $admin->fresh()->unreadNotifications()->first();
 
@@ -72,12 +71,31 @@ class UserManagementTest extends TestCase
         $this->assertNotNull($selectedNotification->fresh()->read_at);
     }
 
+    public function test_old_absolute_notification_url_redirects_on_the_current_host(): void
+    {
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $admin->notifications()->create([
+            'id' => (string) \Illuminate\Support\Str::uuid(),
+            'type' => UserCreatedNotification::class,
+            'data' => [
+                'title' => 'Old notification',
+                'message' => 'Created on another host.',
+                'url' => 'http://127.0.0.1:8000/dashboard/users?search=Jose%20Dela%20Cruz%20Sr.',
+            ],
+        ]);
+        $notification = $admin->fresh()->notifications()->first();
+
+        $this->actingAs($admin)
+            ->post(route('dashboard.notifications.read-one', $notification->id))
+            ->assertRedirect('/dashboard/users?search=Jose%20Dela%20Cruz%20Sr.');
+    }
+
     public function test_user_cannot_mark_another_users_notification_as_read(): void
     {
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
         $otherAdmin = User::factory()->create(['role' => User::ROLE_ADMIN]);
         $otherAdmin->notify(new UserCreatedNotification(
-            User::factory()->create(['role' => User::ROLE_DRIVER])
+            User::factory()->create(['role' => User::ROLE_OFFICER])
         ));
         $notification = $otherAdmin->fresh()->unreadNotifications()->first();
 
@@ -92,10 +110,10 @@ class UserManagementTest extends TestCase
     {
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
         $otherAdmin = User::factory()->create(['role' => User::ROLE_ADMIN]);
-        $driver = User::factory()->create(['role' => User::ROLE_DRIVER]);
-        $admin->notify(new UserCreatedNotification($driver));
-        $admin->notify(new UserCreatedNotification($driver));
-        $otherAdmin->notify(new UserCreatedNotification($driver));
+        $officer = User::factory()->create(['role' => User::ROLE_OFFICER]);
+        $admin->notify(new UserCreatedNotification($officer));
+        $admin->notify(new UserCreatedNotification($officer));
+        $otherAdmin->notify(new UserCreatedNotification($officer));
         $selected = $admin->fresh()->notifications()->first();
         $otherNotification = $otherAdmin->fresh()->notifications()->first();
 
@@ -111,9 +129,9 @@ class UserManagementTest extends TestCase
     public function test_user_can_delete_all_their_notifications(): void
     {
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
-        $driver = User::factory()->create(['role' => User::ROLE_DRIVER]);
-        $admin->notify(new UserCreatedNotification($driver));
-        $admin->notify(new UserCreatedNotification($driver));
+        $officer = User::factory()->create(['role' => User::ROLE_OFFICER]);
+        $admin->notify(new UserCreatedNotification($officer));
+        $admin->notify(new UserCreatedNotification($officer));
 
         $this->actingAs($admin)
             ->delete(route('dashboard.notifications.delete-all'))
@@ -164,8 +182,7 @@ class UserManagementTest extends TestCase
             'nameExtension' => '',
             'phoneNumber' => $user->phoneNumber,
             'email' => 'updated@example.com',
-            'role' => User::ROLE_DRIVER,
-            'plateNumber' => 'XYZ-9876',
+            'role' => User::ROLE_SUPERVISOR,
             'password' => '',
         ])->assertRedirect(route('dashboard.users'));
 
@@ -174,12 +191,73 @@ class UserManagementTest extends TestCase
             'firstName' => 'Updated',
             'lastName' => 'User',
             'email' => 'updated@example.com',
-            'role' => User::ROLE_DRIVER,
+            'role' => User::ROLE_SUPERVISOR,
         ]);
         $this->assertDatabaseHas('notifications', [
             'notifiable_id' => $admin->id,
             'type' => UserActivityNotification::class,
         ]);
+    }
+
+    public function test_edit_back_link_and_update_return_to_the_originating_user_table(): void
+    {
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $supervisor = User::factory()->create(['role' => User::ROLE_SUPERVISOR]);
+
+        $allUsersEdit = $this->actingAs($admin)
+            ->get(route('dashboard.users.edit', ['user' => $supervisor, 'from' => 'users']))
+            ->assertOk()
+            ->assertSee('href="'.route('dashboard.users').'">Back', false)
+            ->assertSee('href="'.route('dashboard.users').'">Cancel', false)
+            ->assertDontSee('name="user_section"', false);
+
+        $this->actingAs($admin)->put(route('dashboard.users.update', $supervisor), [
+            'firstName' => $supervisor->firstName,
+            'middleName' => $supervisor->middleName,
+            'lastName' => $supervisor->lastName,
+            'nameExtension' => $supervisor->nameExtension,
+            'phoneNumber' => $supervisor->phoneNumber,
+            'email' => $supervisor->email,
+            'role' => User::ROLE_SUPERVISOR,
+            'password' => '',
+        ])->assertRedirect(route('dashboard.users'));
+
+        $supervisorEdit = $this->actingAs($admin)
+            ->get(route('dashboard.users.edit', ['user' => $supervisor, 'from' => 'supervisors']))
+            ->assertOk()
+            ->assertSee('href="'.route('dashboard.users.supervisors').'">Back', false)
+            ->assertSee('href="'.route('dashboard.users.supervisors').'">Cancel', false)
+            ->assertSee('name="user_section" value="supervisors"', false);
+    }
+
+    public function test_editing_from_supervisor_details_returns_to_the_same_supervisor(): void
+    {
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $supervisor = User::factory()->create(['role' => User::ROLE_SUPERVISOR]);
+        $detailRoute = route('dashboard.users.supervisors.show', $supervisor);
+
+        $this->actingAs($admin)
+            ->get(route('dashboard.users.edit', [
+                'user' => $supervisor,
+                'from' => 'supervisors',
+                'return_to' => 'detail',
+            ]))
+            ->assertOk()
+            ->assertSee('href="'.$detailRoute.'">Back', false)
+            ->assertSee('href="'.$detailRoute.'">Cancel', false)
+            ->assertSee('name="return_to" value="detail"', false);
+
+        $this->actingAs($admin)->put(route('dashboard.users.update', $supervisor), [
+            'firstName' => $supervisor->firstName,
+            'middleName' => $supervisor->middleName,
+            'lastName' => $supervisor->lastName,
+            'nameExtension' => $supervisor->nameExtension,
+            'phoneNumber' => $supervisor->phoneNumber,
+            'email' => $supervisor->email,
+            'role' => User::ROLE_SUPERVISOR,
+            'user_section' => 'supervisors',
+            'return_to' => 'detail',
+        ])->assertRedirect($detailRoute);
     }
 
     public function test_admin_can_delete_another_user_but_not_themselves(): void
@@ -202,68 +280,17 @@ class UserManagementTest extends TestCase
         $this->assertDatabaseHas('users', ['id' => $admin->id]);
     }
 
-    public function test_removed_badge_number_input_is_ignored(): void
-    {
-        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
-
-        $this->actingAs($admin)->post(route('dashboard.users.store'), [
-            'fullName' => 'Driver Without Badge',
-            'badgeNumber' => 'SHOULD-BE-REMOVED',
-            'plateNumber' => 'DRV-5555',
-            'phoneNumber' => '09175555555',
-            'email' => 'no-badge@example.com',
-            'role' => User::ROLE_DRIVER,
-            'password' => 'password123',
-            'password_confirmation' => 'password123',
-        ])->assertRedirect(route('dashboard.users'));
-
-        $this->assertDatabaseHas('users', [
-            'email' => 'no-badge@example.com',
-            'role' => User::ROLE_DRIVER,
-            'plateNumber' => 'DRV-5555',
-        ]);
-    }
-
-    public function test_plate_number_is_required_for_drivers_and_null_for_enforcers(): void
-    {
-        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
-
-        $this->actingAs($admin)->post(route('dashboard.users.store'), [
-            'fullName' => 'Driver Missing Plate',
-            'phoneNumber' => '09176666666',
-            'email' => 'missing-plate@example.com',
-            'role' => User::ROLE_DRIVER,
-            'password' => 'password123',
-            'password_confirmation' => 'password123',
-        ])->assertSessionHasErrors('plateNumber');
-
-        $this->actingAs($admin)->post(route('dashboard.users.store'), [
-            'fullName' => 'Enforcer No Plate',
-            'plateNumber' => 'SHOULD-BE-REMOVED',
-            'phoneNumber' => '09177777777',
-            'email' => 'enforcer@example.com',
-            'role' => User::ROLE_OFFICER,
-            'password' => 'password123',
-            'password_confirmation' => 'password123',
-        ])->assertRedirect(route('dashboard.users'));
-
-        $this->assertDatabaseHas('users', [
-            'email' => 'enforcer@example.com',
-            'plateNumber' => null,
-        ]);
-    }
-
     public function test_admin_can_search_filter_and_sort_the_user_table(): void
     {
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN, 'fullName' => 'System Administrator']);
-        User::factory()->create(['role' => User::ROLE_DRIVER, 'fullName' => 'Zelda Driver']);
+        User::factory()->create(['role' => User::ROLE_SUPERVISOR, 'fullName' => 'Zelda Supervisor']);
         User::factory()->create(['role' => User::ROLE_OFFICER, 'fullName' => 'Aaron Enforcer']);
-        User::factory()->create(['role' => User::ROLE_DRIVER, 'fullName' => 'Juan Santos Dela Cruz']);
+        User::factory()->create(['role' => User::ROLE_SUPERVISOR, 'fullName' => 'Juan Santos Dela Cruz']);
 
         $this->actingAs($admin)
             ->get(route('dashboard.users', ['search' => 'Zelda']))
             ->assertOk()
-            ->assertSee('Zelda Driver')
+            ->assertSee('Zelda Supervisor')
             ->assertDontSee('Aaron Enforcer');
 
         $this->actingAs($admin)
@@ -275,18 +302,18 @@ class UserManagementTest extends TestCase
             ->get(route('dashboard.users', ['search' => 'Juan Cruz']))
             ->assertOk()
             ->assertSee('Juan Santos Dela Cruz')
-            ->assertDontSee('Zelda Driver');
+            ->assertDontSee('Zelda Supervisor');
 
         $this->actingAs($admin)
             ->get(route('dashboard.users', ['role' => User::ROLE_OFFICER]))
             ->assertOk()
             ->assertSee('Aaron Enforcer')
-            ->assertDontSee('Zelda Driver');
+            ->assertDontSee('Zelda Supervisor');
 
         $this->actingAs($admin)
             ->get(route('dashboard.users', ['sort' => 'name_asc']))
             ->assertOk()
-            ->assertSeeInOrder(['Aaron Enforcer', 'System Administrator', 'Zelda Driver']);
+            ->assertSeeInOrder(['Aaron Enforcer', 'System Administrator', 'Zelda Supervisor']);
     }
 
     public function test_non_admin_cannot_update_or_delete_users(): void
@@ -333,7 +360,7 @@ class UserManagementTest extends TestCase
         ])->assertRedirect(route('dashboard.users'));
 
         $demo = User::where('username', 'demo.admin')->firstOrFail();
-        $this->assertSame('demo.admin@demo.tomeco.local', $demo->email);
+        $this->assertSame('demo.admin@demo.com', $demo->email);
         $this->assertNotNull($demo->email_verified_at);
     }
 
@@ -346,7 +373,12 @@ class UserManagementTest extends TestCase
             'supervisor_id' => $supervisor->id,
             'fullName' => 'Assigned Enforcer',
         ]);
-        User::factory()->create(['role' => User::ROLE_OFFICER, 'fullName' => 'Other Enforcer']);
+        $otherSupervisor = User::factory()->create(['role' => User::ROLE_SUPERVISOR]);
+        User::factory()->create([
+            'role' => User::ROLE_OFFICER,
+            'supervisor_id' => $otherSupervisor->id,
+            'fullName' => 'Other Enforcer',
+        ]);
 
         $this->actingAs($admin)
             ->get(route('dashboard.users.supervisors.show', $supervisor))
@@ -354,6 +386,47 @@ class UserManagementTest extends TestCase
             ->assertSee($supervisor->fullName)
             ->assertSee($assigned->fullName)
             ->assertDontSee('Other Enforcer');
+    }
+
+    public function test_admin_can_add_and_remove_enforcers_from_a_supervisor_details_page(): void
+    {
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $supervisor = User::factory()->create(['role' => User::ROLE_SUPERVISOR, 'fullName' => 'Team Supervisor']);
+        $available = User::factory()->create([
+            'role' => User::ROLE_OFFICER,
+            'supervisor_id' => null,
+            'fullName' => 'Available Enforcer',
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('dashboard.users.supervisors.show', $supervisor))
+            ->assertOk()
+            ->assertSee('Add enforcer')
+            ->assertSee('Search by name')
+            ->assertSee('Available Enforcer')
+            ->assertDontSee('href="'.route('dashboard.users.edit', ['user' => $available, 'from' => 'enforcers']).'"', false);
+
+        $this->actingAs($admin)
+            ->post(route('dashboard.users.supervisors.enforcers.assign', [$supervisor, $available]))
+            ->assertRedirect();
+        $this->assertSame($supervisor->id, $available->fresh()->supervisor_id);
+
+        $this->actingAs($admin)
+            ->delete(route('dashboard.users.supervisors.enforcers.remove', [$supervisor, $available]))
+            ->assertRedirect();
+        $this->assertNull($available->fresh()->supervisor_id);
+    }
+
+    public function test_non_admin_cannot_manage_a_supervisors_enforcers(): void
+    {
+        $supervisor = User::factory()->create(['role' => User::ROLE_SUPERVISOR]);
+        $otherSupervisor = User::factory()->create(['role' => User::ROLE_SUPERVISOR]);
+        $enforcer = User::factory()->create(['role' => User::ROLE_OFFICER, 'supervisor_id' => null]);
+
+        $this->actingAs($otherSupervisor)
+            ->post(route('dashboard.users.supervisors.enforcers.assign', [$supervisor, $enforcer]))
+            ->assertForbidden();
+        $this->assertNull($enforcer->fresh()->supervisor_id);
     }
 
     public function test_enforcer_and_admin_detail_pages_show_their_information(): void
@@ -422,7 +495,7 @@ class UserManagementTest extends TestCase
         $this->actingAs($admin)->post(route('supervisor.time-in'))->assertForbidden();
     }
 
-    public function test_admin_dashboard_shows_supervisor_attendance_table(): void
+    public function test_admin_dashboard_does_not_show_supervisor_attendance_table(): void
     {
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
         $supervisor = User::factory()->create(['role' => User::ROLE_SUPERVISOR, 'fullName' => 'Attendance Supervisor']);
@@ -436,9 +509,8 @@ class UserManagementTest extends TestCase
         $this->actingAs($admin)
             ->get(route('dashboard'))
             ->assertOk()
-            ->assertSee('Time In / Time Out Records')
-            ->assertSee('Attendance Supervisor')
-            ->assertSee('Completed');
+            ->assertDontSee('Time In / Time Out Records')
+            ->assertDontSee('Attendance Supervisor');
     }
 
     public function test_only_admin_can_open_the_attendance_records_page(): void
@@ -448,5 +520,68 @@ class UserManagementTest extends TestCase
 
         $this->actingAs($admin)->get(route('dashboard.attendance'))->assertOk()->assertSee('Supervisor Attendance');
         $this->actingAs($supervisor)->get(route('dashboard.attendance'))->assertForbidden();
+    }
+
+    public function test_attendance_page_lists_each_supervisor_only_once(): void
+    {
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $supervisor = User::factory()->create(['role' => User::ROLE_SUPERVISOR, 'fullName' => 'Unique Attendance User']);
+        SupervisorAttendance::create(['user_id' => $supervisor->id, 'attendance_date' => today()->subDay(), 'time_in' => now()->subDay()]);
+        SupervisorAttendance::create(['user_id' => $supervisor->id, 'attendance_date' => today(), 'time_in' => now()]);
+
+        $this->actingAs($admin)
+            ->get(route('dashboard.attendance'))
+            ->assertOk()
+            ->assertSeeText('Unique Attendance User', false)
+            ->assertSeeText('2')
+            ->assertSeeText('View details')
+            ->assertSeeTextInOrder(['Unique Attendance User', '2']);
+
+        $response = $this->actingAs($admin)->get(route('dashboard.attendance'));
+        $this->assertSame(1, substr_count($response->getContent(), 'Unique Attendance User'));
+    }
+
+    public function test_admin_can_open_all_timestamps_for_a_specific_supervisor(): void
+    {
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $supervisor = User::factory()->create(['role' => User::ROLE_SUPERVISOR, 'fullName' => 'Timestamp Supervisor']);
+        SupervisorAttendance::create(['user_id' => $supervisor->id, 'attendance_date' => today(), 'time_in' => now()->subHour(), 'time_out' => now()]);
+
+        $this->actingAs($admin)
+            ->get(route('dashboard.attendance.supervisor', $supervisor))
+            ->assertOk()
+            ->assertSee('Timestamp Supervisor')
+            ->assertSee('Complete Time In and Time Out timestamp history')
+            ->assertSee('Completed');
+
+        $this->actingAs($supervisor)
+            ->get(route('dashboard.attendance.supervisor', $supervisor))
+            ->assertForbidden();
+    }
+
+    public function test_supervisor_can_manage_only_available_enforcers_on_their_team(): void
+    {
+        $supervisor = User::factory()->create(['role' => User::ROLE_SUPERVISOR]);
+        $otherSupervisor = User::factory()->create(['role' => User::ROLE_SUPERVISOR]);
+        $available = User::factory()->create(['role' => User::ROLE_OFFICER, 'supervisor_id' => null, 'fullName' => 'Available Enforcer']);
+        $taken = User::factory()->create(['role' => User::ROLE_OFFICER, 'supervisor_id' => $otherSupervisor->id]);
+
+        $this->actingAs($supervisor)
+            ->get(route('supervisor.team'))
+            ->assertOk()
+            ->assertSee('Available Enforcer')
+            ->assertSee('Search by name')
+            ->assertSee('teamEnforcerSearch');
+        $this->actingAs($supervisor)->post(route('supervisor.team.assign', $available))->assertRedirect();
+        $this->assertSame($supervisor->id, $available->fresh()->supervisor_id);
+
+        $this->actingAs($supervisor)->post(route('supervisor.team.assign', $taken))->assertRedirect();
+        $this->assertSame($otherSupervisor->id, $taken->fresh()->supervisor_id);
+
+        $this->actingAs($supervisor)->delete(route('supervisor.team.remove', $available))->assertRedirect();
+        $this->assertNull($available->fresh()->supervisor_id);
+
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $this->actingAs($admin)->get(route('supervisor.team'))->assertForbidden();
     }
 }

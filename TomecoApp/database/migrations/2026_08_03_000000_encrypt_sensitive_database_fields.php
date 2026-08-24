@@ -10,8 +10,7 @@ return new class extends Migration
 {
     /** @var array<string, list<string>> */
     private array $encryptedColumns = [
-        'violations' => ['driver_name', 'license_number', 'location'],
-        'impounded_vehicles' => ['owner', 'location'],
+        'violations' => ['motorist_name', 'license_number', 'location'],
     ];
 
     public function up(): void
@@ -58,27 +57,19 @@ return new class extends Migration
         }
 
         Schema::table('violations', function (Blueprint $table): void {
-            $table->string('driver_name')->change();
+            $table->string('motorist_name')->change();
             $table->string('license_number')->nullable()->change();
         });
 
-        Schema::table('impounded_vehicles', function (Blueprint $table): void {
-            $table->string('owner')->change();
-            $table->string('location')->change();
-        });
     }
 
     private function changeColumnsToText(): void
     {
         Schema::table('violations', function (Blueprint $table): void {
-            $table->text('driver_name')->change();
+            $table->text('motorist_name')->change();
             $table->text('license_number')->nullable()->change();
             $table->text('location')->nullable()->change();
         });
 
-        Schema::table('impounded_vehicles', function (Blueprint $table): void {
-            $table->text('owner')->change();
-            $table->text('location')->change();
-        });
     }
 };

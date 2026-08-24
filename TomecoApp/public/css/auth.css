@@ -134,9 +134,15 @@ body.auth-page.login-page {
 }
 
 .auth-forgot-link {
-    justify-self: end;
-    margin-top: -10px;
     font-size: 14px;
+    text-align: right;
+}
+
+.auth-login-options {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
 }
 
 .auth-note {
@@ -259,6 +265,15 @@ body.auth-page.login-page {
         padding: 28px;
         border: 1px solid #fee2e2;
         border-radius: 8px;
+    }
+
+    .auth-login-options {
+        gap: 10px;
+    }
+
+    .auth-login-options .auth-check,
+    .auth-login-options .auth-forgot-link {
+        font-size: 13px;
     }
 
     .dashboard-header {

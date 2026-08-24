@@ -24,7 +24,7 @@ class UserCreatedNotification extends Notification
         return [
             'title' => 'New user registered',
             'message' => $this->createdUser->fullName.' was added as '.ucfirst($this->createdUser->role).'.',
-            'url' => route('dashboard.users', ['search' => $this->createdUser->fullName]),
+            'url' => route('dashboard.users', ['search' => $this->createdUser->fullName], false),
         ];
     }
 }

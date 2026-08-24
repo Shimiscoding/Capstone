@@ -29,8 +29,8 @@ class UserActivityNotification extends Notification
             'title' => $wasDeleted ? 'User account deleted' : 'User account updated',
             'message' => $this->userName.' ('.ucfirst($this->userRole).') was '.$this->action.'.',
             'url' => $wasDeleted
-                ? route('dashboard.users')
-                : route('dashboard.users', ['search' => $this->userName]),
+                ? route('dashboard.users', absolute: false)
+                : route('dashboard.users', ['search' => $this->userName], false),
         ];
     }
 }

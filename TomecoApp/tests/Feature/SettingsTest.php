@@ -19,7 +19,7 @@ class SettingsTest extends TestCase
         $this->actingAs($admin)->put(route('dashboard.settings.update'), [
             'section' => 'general', 'organization_name' => 'TOMECO Legazpi', 'address' => 'City Hall',
             'phone' => '09123456789', 'email' => 'admin@example.com', 'timezone' => 'Asia/Manila',
-            'date_format' => 'Y-m-d', 'violation_prefix' => 'VIO-', 'payment_prefix' => 'PAY-', 'impound_prefix' => 'IMP-',
+            'date_format' => 'Y-m-d', 'violation_prefix' => 'VIO-',
         ])->assertRedirect(route('dashboard.settings', ['tab' => 'general']));
 
         $this->assertEquals('TOMECO Legazpi', Setting::where('key', 'general.organization_name')->value('value'));
@@ -37,6 +37,25 @@ class SettingsTest extends TestCase
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
 
         $this->actingAs($admin)->get(route('dashboard.settings.backup'))
-            ->assertOk()->assertHeader('content-type', 'application/json')->assertSee('impounded_vehicles');
+            ->assertOk()->assertHeader('content-type', 'application/json')->assertSee('violations');
+    }
+
+    public function test_admin_can_disable_public_admin_signup(): void
+    {
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+
+        $this->actingAs($admin)->put(route('dashboard.settings.update'), [
+            'section' => 'security',
+            'password_min_length' => 8,
+            'session_timeout' => 120,
+            'login_attempts' => 5,
+            'api_token_days' => 30,
+            'audit_retention_days' => 365,
+        ])->assertRedirect(route('dashboard.settings', ['tab' => 'security']));
+
+        $this->post(route('logout'));
+        $this->get(route('login'))->assertOk()->assertDontSee('Sign up as admin');
+        $this->get(route('register'))->assertNotFound();
+        $this->post(route('register.store'), [])->assertNotFound();
     }
 }

@@ -13,7 +13,6 @@ return new class extends Migration
             $table->string('badgeNumber')->nullable()->change();
         });
 
-        DB::table('users')->where('role', 'driver')->update(['badgeNumber' => null]);
     }
 
     public function down(): void

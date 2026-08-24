@@ -10,24 +10,22 @@ class MobileLoginTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_driver_can_log_in_to_the_mobile_api(): void
+    public function test_officer_can_log_in_to_the_mobile_api(): void
     {
-        $driver = User::factory()->create([
-            'role' => User::ROLE_DRIVER,
-            'driverLicense' => 'N01-23-456789',
+        $officer = User::factory()->create([
+            'role' => User::ROLE_OFFICER,
             'password' => 'password123',
         ]);
 
         $response = $this->postJson('/api/auth/login', [
-            'login' => $driver->email,
+            'login' => $officer->email,
             'password' => 'password123',
         ]);
 
         $response
             ->assertOk()
             ->assertJsonPath('success', true)
-            ->assertJsonPath('user.role', User::ROLE_DRIVER)
-            ->assertJsonPath('user.driverLicense', 'N01-23-456789')
+            ->assertJsonPath('user.role', User::ROLE_OFFICER)
             ->assertJsonStructure(['token']);
     }
 

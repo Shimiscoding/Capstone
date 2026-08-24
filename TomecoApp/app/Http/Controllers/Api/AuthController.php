@@ -41,11 +41,11 @@ class AuthController extends Controller
             ]);
         }
 
-        // Mobile access is available to officers and registered drivers.
-        if (!in_array($user->role, [User::ROLE_OFFICER, User::ROLE_DRIVER], true)) {
+        // Mobile access is available to enforcement officers.
+        if ($user->role !== User::ROLE_OFFICER) {
             return response()->json([
                 'success' => false,
-                'message' => 'Only officer and driver accounts can use the mobile app.',
+                'message' => 'Only officer accounts can use the mobile app.',
             ], 403);
         }
 
@@ -71,8 +71,6 @@ class AuthController extends Controller
                 'lastName' => $user->lastName,
                 'nameExtension' => $user->nameExtension,
                 'phoneNumber' => $user->phoneNumber,
-                'driverLicense' => $user->driverLicense,
-                'plateNumber' => $user->plateNumber,
                 'email' => $user->email,
                 'role' => $user->role,
             ],

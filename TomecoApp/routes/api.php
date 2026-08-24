@@ -5,7 +5,7 @@ use App\Http\Controllers\Api\UserController;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/auth/login', [AuthController::class, 'login']);
-Route::apiResource('users', UserController::class);
+Route::apiResource('users', UserController::class)->except(['store']);
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/auth/profile', [AuthController::class, 'profile']);

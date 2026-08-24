@@ -2,162 +2,105 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\ImpoundedVehicle;
-use App\Models\Payment;
 use App\Models\User;
 use App\Models\Violation;
 use App\Notifications\UserActivityNotification;
 use App\Notifications\UserCreatedNotification;
-use App\Services\ImpoundedVehicleImporter;
 use App\Services\Settings;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class DashboardController extends Controller
 {
-    public function driverViolators(Request $request): View
+    /*
+    |--------------------------------------------------------------------------
+    | Reports and Analytics
+    |--------------------------------------------------------------------------
+    */
+
+    public function violationRecords(Request $request): View
     {
         $search = trim((string) $request->query('search', ''));
-        $status = in_array($request->query('status'), ['paid', 'unpaid', 'pending'], true)
-            ? $request->query('status')
+        $violationType = trim((string) $request->query('violation_type', ''));
+        $dateFrom = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $request->query('date_from'))
+            ? (string) $request->query('date_from')
             : '';
-        $isDriver = $request->user()->isDriver();
-
+        $dateTo = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $request->query('date_to'))
+            ? (string) $request->query('date_to')
+            : '';
         $query = Violation::query()
-            ->with('user')
-            ->when($isDriver, fn ($query) => $query->where('user_id', $request->user()->id))
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($query) use ($search): void {
                     $query->where('plate_number', 'like', "%{$search}%")
                         ->orWhere('violation_type', 'like', "%{$search}%")
-                        ->orWhereHas('user', fn ($userQuery) => $userQuery
-                            ->where('firstName', 'like', "%{$search}%")
-                            ->orWhere('middleName', 'like', "%{$search}%")
-                            ->orWhere('lastName', 'like', "%{$search}%")
-                            ->orWhere('nameExtension', 'like', "%{$search}%"));
+                        ->orWhere('motorist_name', 'like', "%{$search}%");
                 });
             })
-            ->when($status !== '', fn ($query) => $query->where('status', $status));
+            ->when($violationType !== '', fn ($query) => $query->where('violation_type', $violationType))
+            ->when($dateFrom !== '', fn ($query) => $query->whereDate('created_at', '>=', $dateFrom))
+            ->when($dateTo !== '', fn ($query) => $query->whereDate('created_at', '<=', $dateTo));
 
-        $summaryQuery = Violation::query()
-            ->when($isDriver, fn ($query) => $query->where('user_id', $request->user()->id));
+        $summaryQuery = Violation::query();
 
-        return view('dashboard.driver-violators', [
+        return view('dashboard.violation-records', [
             'violations' => (clone $query)->latest()->paginate(15)->withQueryString(),
             'search' => $search,
-            'status' => $status,
+            'violationType' => $violationType,
+            'dateFrom' => $dateFrom,
+            'dateTo' => $dateTo,
+            'violationTypes' => Violation::query()->select('violation_type')->distinct()->orderBy('violation_type')->pluck('violation_type'),
             'totalViolations' => (clone $summaryQuery)->count(),
-            'unpaidViolations' => (clone $summaryQuery)->where('status', '!=', 'paid')->count(),
-            'totalFines' => (clone $summaryQuery)->sum('fine_amount'),
-            'isDriverView' => $isDriver,
+            'violationsThisMonth' => (clone $summaryQuery)
+                ->whereBetween('created_at', [now()->startOfMonth(), now()->endOfMonth()])
+                ->count(),
         ]);
     }
 
-    public function payments(Request $request, Settings $settings): View
+    public function analytics(Request $request, Settings $settings): View
     {
-        abort_unless($settings->allows($request->user(), 'view_payments'), 403);
-        $isDriver = $request->user()->role === User::ROLE_DRIVER;
-        $paymentQuery = Payment::query()
-            ->with(['violation', 'user'])
-            ->when($isDriver, fn ($query) => $query->where('user_id', $request->user()->id));
-        $violationQuery = Violation::query()
-            ->when($isDriver, fn ($query) => $query->where('user_id', $request->user()->id));
+        abort_if($request->user()->isSupervisor(), 403);
+        $period = in_array($request->query('period'), ['daily', 'monthly', 'yearly'], true)
+            ? $request->query('period')
+            : 'daily';
+        $buckets = match ($period) {
+            'monthly' => collect(range(11, 0))->map(function (int $monthsAgo): array {
+                $date = now()->subMonths($monthsAgo);
+                return ['label' => $date->format('M'), 'date' => $date->format('F Y'), 'start' => $date->copy()->startOfMonth(), 'end' => $date->copy()->endOfMonth()];
+            }),
+            'yearly' => collect(range(4, 0))->map(function (int $yearsAgo): array {
+                $date = now()->subYears($yearsAgo);
+                return ['label' => $date->format('Y'), 'date' => $date->format('Y'), 'start' => $date->copy()->startOfYear(), 'end' => $date->copy()->endOfYear()];
+            }),
+            default => collect(range(6, 0))->map(function (int $daysAgo): array {
+                $date = now()->subDays($daysAgo);
+                return ['label' => $date->format('D'), 'date' => $date->format('M d'), 'start' => $date->copy()->startOfDay(), 'end' => $date->copy()->endOfDay()];
+            }),
+        };
+        $dailyViolations = $buckets->map(fn (array $item): array => $item + [
+            'value' => Violation::query()->whereBetween('created_at', [$item['start'], $item['end']])->count(),
+        ]);
+        $dailyUsers = $buckets->map(fn (array $item): array => $item + [
+            'value' => User::query()->whereBetween('created_at', [$item['start'], $item['end']])->count(),
+        ]);
 
-        $paid = (clone $paymentQuery)->where('status', 'paid');
-        $pending = (clone $paymentQuery)->where('status', 'pending');
-        $dailyCollections = collect(range(6, 0))->map(function (int $daysAgo) use ($paymentQuery): array {
-            $day = now()->subDays($daysAgo);
-
-            return [
-                'label' => $day->format('D'),
-                'amount' => (clone $paymentQuery)->where('status', 'paid')->whereDate('paid_at', $day)->sum('amount'),
-            ];
-        });
-        $maxDaily = max(1, (int) $dailyCollections->max('amount'));
-
-        return view('dashboard.payment', [
-            'transactions' => (clone $paymentQuery)->latest()->take(20)->get(),
-            'unpaidViolations' => (clone $violationQuery)->where('status', '!=', 'paid')->latest()->get(),
-            'totalCollected' => (clone $paid)->sum('amount'),
-            'successfulCount' => (clone $paid)->count(),
-            'pendingCount' => (clone $pending)->count(),
-            'pendingAmount' => (clone $pending)->sum('amount'),
-            'failedCount' => (clone $paymentQuery)->where('status', 'failed')->count(),
-            'dailyCollections' => $dailyCollections,
-            'maxDaily' => $maxDaily,
+        return view('dashboard.analytics', [
+            'dailyViolations' => $dailyViolations,
+            'dailyUsers' => $dailyUsers,
+            'period' => $period,
+            'periodDescription' => match ($period) { 'monthly' => 'last 12 months', 'yearly' => 'last 5 years', default => 'last 7 days' },
         ]);
     }
 
-    public function impounding(): View
-    {
-        $vehicles = ImpoundedVehicle::latest('impounded_at')->get();
-
-        return view('dashboard.impounding', [
-            'vehicles' => $vehicles,
-            'vehicleTypes' => ImpoundedVehicle::query()->distinct()->orderBy('type')->pluck('type'),
-            'availableYears' => ImpoundedVehicle::query()->selectRaw('YEAR(impounded_at) as year')->distinct()->orderBy('year')->pluck('year'),
-        ]);
-    }
-
-    public function exportImpounding(Request $request, Settings $settings): Response
-    {
-        abort_unless($settings->allows($request->user(), 'export'), 403);
-        $filters = $request->validate([
-            'vehicle_type' => ['nullable', 'string', Rule::in(['Car', 'Motorcycle'])],
-            'year_from' => ['required', 'integer', 'between:2000,2100'],
-            'year_to' => ['required', 'integer', 'between:2000,2100', 'gte:year_from'],
-        ]);
-
-        $vehicles = ImpoundedVehicle::query()
-            ->when($filters['vehicle_type'] ?? null, fn ($query, $type) => $query->where('type', $type))
-            ->whereYear('impounded_at', '>=', $filters['year_from'])
-            ->whereYear('impounded_at', '<=', $filters['year_to'])
-            ->orderByDesc('impounded_at')
-            ->get();
-        $filename = 'impounded-vehicles-'.$filters['year_from'].'-'.$filters['year_to'].'.xls';
-
-        return response(view('dashboard.exports.impounded-vehicles', compact('vehicles', 'filters'))->render(), 200, [
-            'Content-Type' => 'application/vnd.ms-excel; charset=UTF-8',
-            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
-            'Cache-Control' => 'max-age=0, no-cache, no-store, must-revalidate',
-        ]);
-    }
-
-    public function importImpounding(Request $request, ImpoundedVehicleImporter $importer, Settings $settings): RedirectResponse
-    {
-        abort_unless($settings->allows($request->user(), 'import'), 403);
-        $request->validate([
-            'excel_file' => [
-                'required',
-                'file',
-                'max:'.((int) $settings->get('data.max_upload_mb', 5) * 1024),
-                function (string $attribute, mixed $value, \Closure $fail): void {
-                    if (! in_array(strtolower($value->getClientOriginalExtension()), ['xlsx', 'xls', 'csv'], true)) {
-                        $fail('The Excel file must have an .xlsx, .xls, or .csv extension.');
-                    }
-                },
-            ],
-        ]);
-
-        try {
-            $result = $importer->import($request->file('excel_file'));
-        } catch (\Throwable $exception) {
-            report($exception);
-
-            return to_route('dashboard.impounding')->with('error', 'Import failed: '.$exception->getMessage());
-        }
-
-        $message = "Import complete: {$result['imported']} added and {$result['updated']} updated.";
-
-        return to_route('dashboard.impounding')
-            ->with('success', $message)
-            ->with('import_errors', $result['errors']);
-    }
+    /*
+    |--------------------------------------------------------------------------
+    | Dashboard
+    |--------------------------------------------------------------------------
+    */
 
     public function index(Request $request): View
     {
@@ -167,36 +110,40 @@ class DashboardController extends Controller
                 ->orderBy('firstName')
                 ->orderBy('lastName')]);
 
-            return view('dashboard.supervisor', [
+            return view('supervisor.index', [
                 'supervisor' => $supervisor,
                 'enforcerCount' => $supervisor->enforcers->count(),
                 'barangayCount' => $supervisor->enforcers->pluck('barangay')->filter()->unique()->count(),
                 'areaCount' => $supervisor->enforcers->pluck('area')->filter()->unique()->count(),
-                'todayAttendance' => $supervisor->supervisorAttendances()->whereDate('attendance_date', today())->first(),
-                'recentAttendances' => $supervisor->supervisorAttendances()->latest('attendance_date')->take(7)->get(),
             ]);
         }
 
-        $isDriver = $request->user()->isDriver();
-        $violationQuery = Violation::query()
-            ->when($isDriver, fn ($query) => $query->where('user_id', $request->user()->id));
-        $impoundedQuery = ImpoundedVehicle::query()
-            ->when($isDriver, fn ($query) => $query->where('user_id', $request->user()->id));
+        $violationQuery = Violation::query();
+        $activityDays = collect(range(6, 0))->map(function (int $daysAgo): array {
+            $date = now()->subDays($daysAgo);
+            $start = $date->copy()->startOfDay();
+            $end = $date->copy()->endOfDay();
 
+            return [
+                'label' => $date->format('D'),
+                'violations' => Violation::query()->whereBetween('created_at', [$start, $end])->count(),
+                'users' => User::query()->whereBetween('created_at', [$start, $end])->count(),
+            ];
+        });
         return view('dashboard.index', [
             'totalUsers' => User::count(),
             'totalTickets' => (clone $violationQuery)->count(),
             'outstandingTickets' => (clone $violationQuery)->where('status', '!=', 'paid')->count(),
-            'impoundedVehicles' => (clone $impoundedQuery)->where('status', '!=', 'Released')->count(),
-            'forReleaseVehicles' => (clone $impoundedQuery)->where('status', 'For release')->count(),
-            'recentViolations' => (clone $violationQuery)->with('user')->latest()->take(5)->get(),
-            'recentImpoundedVehicles' => (clone $impoundedQuery)->latest('impounded_at')->take(5)->get(),
-            'isDriverDashboard' => $isDriver,
-            'supervisorAttendances' => $request->user()->isAdmin()
-                ? \App\Models\SupervisorAttendance::with('user')->latest('attendance_date')->latest('time_in')->take(20)->get()
-                : collect(),
+            'recentViolations' => (clone $violationQuery)->latest()->take(5)->get(),
+            'activityDays' => $activityDays,
         ]);
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | User Listings
+    |--------------------------------------------------------------------------
+    */
 
     public function users(Request $request): View
     {
@@ -210,6 +157,12 @@ class DashboardController extends Controller
         $sort = in_array($request->query('sort'), ['latest', 'oldest', 'name_asc', 'name_desc'], true)
             ? $request->query('sort')
             : 'latest';
+        $joinedFrom = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $request->query('joined_from'))
+            ? (string) $request->query('joined_from')
+            : '';
+        $joinedTo = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $request->query('joined_to'))
+            ? (string) $request->query('joined_to')
+            : '';
 
         $users = User::query()->with('supervisor')
             ->when($nameTerms !== [], function ($query) use ($nameTerms) {
@@ -227,6 +180,8 @@ class DashboardController extends Controller
                 }
             })
             ->when($role !== '', fn ($query) => $query->where('role', $role))
+            ->when($joinedFrom !== '', fn ($query) => $query->whereDate('created_at', '>=', $joinedFrom))
+            ->when($joinedTo !== '', fn ($query) => $query->whereDate('created_at', '<=', $joinedTo))
             ->when($sort === 'latest', fn ($query) => $query->orderByDesc('created_at'))
             ->when($sort === 'oldest', fn ($query) => $query->orderBy('created_at'))
             ->when($sort === 'name_asc', fn ($query) => $query->orderBy('firstName')->orderBy('lastName'))
@@ -234,20 +189,76 @@ class DashboardController extends Controller
             ->paginate(10)
             ->withQueryString();
 
-        return view('dashboard.users.user', compact('users', 'search', 'role', 'sort'));
+        return view('dashboard.users.user', compact('users', 'search', 'role', 'sort', 'joinedFrom', 'joinedTo'));
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Attendance
+    |--------------------------------------------------------------------------
+    */
 
     public function attendance(Request $request): View
     {
         $this->ensureAdmin($request);
 
-        return view('dashboard.attendance', [
-            'attendances' => \App\Models\SupervisorAttendance::with('user')
-                ->latest('attendance_date')
-                ->latest('time_in')
-                ->paginate(20),
+        $attendanceType = in_array($request->query('type'), ['supervisor', 'enforcer', 'admin'], true)
+            ? $request->query('type')
+            : 'supervisor';
+        $role = match ($attendanceType) {
+            'enforcer' => User::ROLE_OFFICER,
+            'admin' => User::ROLE_ADMIN,
+            default => User::ROLE_SUPERVISOR,
+        };
+        $search = trim((string) $request->query('search', ''));
+        $nameTerms = preg_split('/\s+/', $search, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        $sort = in_array($request->query('sort'), ['latest', 'oldest', 'name_asc', 'name_desc'], true)
+            ? $request->query('sort')
+            : 'latest';
+        return view('supervisor.attendance', [
+            'staffMembers' => User::query()
+                ->where('role', $role)
+                ->when($nameTerms !== [], function ($query) use ($nameTerms) {
+                    foreach ($nameTerms as $term) {
+                        $query->where(function ($nameQuery) use ($term) {
+                            $nameQuery->where('firstName', 'like', "%{$term}%")
+                                ->orWhere('middleName', 'like', "%{$term}%")
+                                ->orWhere('lastName', 'like', "%{$term}%")
+                                ->orWhere('nameExtension', 'like', "%{$term}%")
+                                ->orWhere('username', 'like', "%{$term}%")
+                                ->orWhere('email', 'like', "%{$term}%");
+                        });
+                    }
+                })
+                ->withCount(['supervisorAttendances', 'enforcerAttendances'])
+                ->when($sort === 'latest', fn ($query) => $query->orderByDesc('created_at'))
+                ->when($sort === 'oldest', fn ($query) => $query->orderBy('created_at'))
+                ->when($sort === 'name_asc', fn ($query) => $query->orderBy('firstName')->orderBy('lastName'))
+                ->when($sort === 'name_desc', fn ($query) => $query->orderByDesc('firstName')->orderByDesc('lastName'))
+                ->paginate(10)
+                ->withQueryString(),
+            'search' => $search,
+            'sort' => $sort,
+            'attendanceType' => $attendanceType,
         ]);
     }
+
+    public function supervisorAttendance(Request $request, User $user): View
+    {
+        $this->ensureAdmin($request);
+        abort_unless($user->role === User::ROLE_SUPERVISOR, 404);
+
+        return view('supervisor.attendance-show', [
+            'supervisor' => $user,
+            'attendances' => $user->supervisorAttendances()->latest('attendance_date')->paginate(20)->withQueryString(),
+        ]);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Role-Based User Management
+    |--------------------------------------------------------------------------
+    */
 
     public function supervisors(Request $request): View
     {
@@ -291,7 +302,14 @@ class DashboardController extends Controller
             ->orderBy('firstName')
             ->orderBy('lastName')]);
 
-        return view('dashboard.users.supervisor-show', ['supervisor' => $user]);
+        return view('supervisor.show', [
+            'supervisor' => $user,
+            'availableEnforcers' => User::where('role', User::ROLE_OFFICER)
+                ->whereNull('supervisor_id')
+                ->orderBy('firstName')
+                ->orderBy('lastName')
+                ->get(),
+        ]);
     }
 
     public function showEnforcer(Request $request, User $user): View
@@ -328,6 +346,12 @@ class DashboardController extends Controller
         return $this->createUser($request)->with('fixedRole', User::ROLE_ADMIN)->with('userSection', 'admins');
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | User Account CRUD
+    |--------------------------------------------------------------------------
+    */
+
     public function createUser(Request $request): View
     {
         $this->ensureAdmin($request);
@@ -352,25 +376,22 @@ class DashboardController extends Controller
             'area' => ['nullable', 'string', 'max:100'],
             'barangay' => ['nullable', 'string', 'max:100'],
             'supervisor_id' => ['exclude_unless:role,'.User::ROLE_OFFICER, 'nullable', Rule::exists('users', 'id')->where('role', User::ROLE_SUPERVISOR)],
-            'plateNumber' => ['exclude_unless:role,'.User::ROLE_DRIVER, 'required', 'string', 'max:50', 'unique:users,plateNumber'],
-            'driverLicense' => ['exclude_unless:role,'.User::ROLE_DRIVER, 'nullable', 'string', 'max:255', 'unique:users,driverLicense'],
             'phoneNumber' => ['required', 'string', 'regex:/^09\d{9}$/', 'unique:users,phoneNumber'],
             'email' => ['nullable', 'required_unless:demo_account,1', 'email', 'max:255', 'unique:users,email'],
             'demo_account' => ['nullable', 'boolean'],
             'role' => ['required', Rule::in(User::ROLES)],
+            'account_status' => ['nullable', Rule::in(User::ACCOUNT_STATUSES)],
             'password' => ['required', 'confirmed', 'min:'.app(Settings::class)->get('security.password_min_length', 8)],
             'user_section' => ['nullable', Rule::in(['supervisors', 'enforcers', 'admins'])],
         ]);
 
-        $attributes['plateNumber'] = $attributes['role'] === User::ROLE_DRIVER ? $attributes['plateNumber'] : null;
-        $attributes['driverLicense'] = $attributes['role'] === User::ROLE_DRIVER ? ($attributes['driverLicense'] ?? null) : null;
         $attributes['supervisor_id'] = $attributes['role'] === User::ROLE_OFFICER ? ($attributes['supervisor_id'] ?? null) : null;
 
         if ($request->boolean('demo_account')) {
             $demoName = filled($attributes['username'] ?? null)
                 ? Str::lower($attributes['username'])
                 : 'demo-user-'.Str::lower(Str::random(8));
-            $attributes['email'] = $demoName.'@demo.tomeco.local';
+            $attributes['email'] = $demoName.'@demo.com';
         }
 
         $createdUser = User::create($attributes);
@@ -393,17 +414,23 @@ class DashboardController extends Controller
     {
         $this->ensureAdmin($request);
 
-        $userSection = match ($user->role) {
+        $roleSection = match ($user->role) {
             User::ROLE_SUPERVISOR => 'supervisors',
             User::ROLE_OFFICER => 'enforcers',
             User::ROLE_ADMIN => 'admins',
             default => null,
         };
+        $requestedSection = $request->query('from');
+        $userSection = in_array($requestedSection, ['supervisors', 'enforcers', 'admins'], true)
+            ? $requestedSection
+            : ($requestedSection === 'users' ? null : $roleSection);
+        $returnTo = $request->query('return_to') === 'detail' ? 'detail' : null;
 
         return view('dashboard.users.user-create', [
             'editedUser' => $user,
             'supervisors' => User::where('role', User::ROLE_SUPERVISOR)->orderBy('firstName')->orderBy('lastName')->get(),
             'userSection' => $userSection,
+            'returnTo' => $returnTo,
         ]);
     }
 
@@ -422,18 +449,16 @@ class DashboardController extends Controller
             'area' => ['nullable', 'string', 'max:100'],
             'barangay' => ['nullable', 'string', 'max:100'],
             'supervisor_id' => ['exclude_unless:role,'.User::ROLE_OFFICER, 'nullable', Rule::exists('users', 'id')->where('role', User::ROLE_SUPERVISOR)],
-            'plateNumber' => ['exclude_unless:role,'.User::ROLE_DRIVER, 'required', 'string', 'max:50', Rule::unique('users', 'plateNumber')->ignore($user)],
-            'driverLicense' => ['exclude_unless:role,'.User::ROLE_DRIVER, 'nullable', 'string', 'max:255', Rule::unique('users', 'driverLicense')->ignore($user)],
             'phoneNumber' => ['required', 'string', 'regex:/^09\d{9}$/', Rule::unique('users', 'phoneNumber')->ignore($user)],
             'email' => ['nullable', 'required_unless:demo_account,1', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user)],
             'demo_account' => ['nullable', 'boolean'],
             'role' => ['required', Rule::in(User::ROLES)],
+            'account_status' => ['sometimes', Rule::in(User::ACCOUNT_STATUSES)],
             'password' => ['nullable', 'confirmed', 'min:'.app(Settings::class)->get('security.password_min_length', 8)],
             'user_section' => ['nullable', Rule::in(['supervisors', 'enforcers', 'admins'])],
+            'return_to' => ['nullable', Rule::in(['detail'])],
         ]);
 
-        $attributes['plateNumber'] = $attributes['role'] === User::ROLE_DRIVER ? $attributes['plateNumber'] : null;
-        $attributes['driverLicense'] = $attributes['role'] === User::ROLE_DRIVER ? ($attributes['driverLicense'] ?? null) : null;
         $attributes['supervisor_id'] = $attributes['role'] === User::ROLE_OFFICER ? ($attributes['supervisor_id'] ?? null) : null;
 
         if (blank($attributes['password'] ?? null)) {
@@ -444,10 +469,16 @@ class DashboardController extends Controller
             $demoName = filled($attributes['username'] ?? null)
                 ? Str::lower($attributes['username'])
                 : 'demo-user-'.$user->id;
-            $attributes['email'] = $demoName.'@demo.tomeco.local';
+            $attributes['email'] = $demoName.'@demo.com';
         }
 
+        $selectedStatus = $attributes['account_status'] ?? $user->effectiveAccountStatus();
         $user->update($attributes);
+        if ($selectedStatus === User::STATUS_PENDING) {
+            $user->forceFill(['email_verified_at' => null])->save();
+        } elseif ($selectedStatus === User::STATUS_ACTIVE && ! $user->hasVerifiedEmail()) {
+            $user->forceFill(['email_verified_at' => now()])->save();
+        }
         if ($request->boolean('demo_account')) {
             $user->forceFill(['email_verified_at' => now()])->save();
         }
@@ -455,6 +486,19 @@ class DashboardController extends Controller
             User::where('role', User::ROLE_ADMIN)->get(),
             new UserActivityNotification('updated', $user->fullName, $user->role),
         );
+
+        if (($attributes['return_to'] ?? null) === 'detail') {
+            $destination = match ($user->role) {
+                User::ROLE_SUPERVISOR => 'dashboard.users.supervisors.show',
+                User::ROLE_OFFICER => 'dashboard.users.enforcers.show',
+                User::ROLE_ADMIN => 'dashboard.users.admins.show',
+                default => 'dashboard.users',
+            };
+
+            return $destination === 'dashboard.users'
+                ? redirect()->route($destination)->with('success', 'User account updated successfully.')
+                : redirect()->route($destination, $user)->with('success', 'User account updated successfully.');
+        }
 
         $destination = match ($attributes['user_section'] ?? null) {
             'supervisors' => 'dashboard.users.supervisors',
@@ -493,6 +537,12 @@ class DashboardController extends Controller
         return redirect()->route($destination)->with('success', 'User account deleted successfully.');
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Notifications
+    |--------------------------------------------------------------------------
+    */
+
     public function markNotificationsRead(Request $request): RedirectResponse
     {
         $request->user()->unreadNotifications->markAsRead();
@@ -500,12 +550,38 @@ class DashboardController extends Controller
         return back();
     }
 
+    public function notificationFeed(Request $request): JsonResponse
+    {
+        $notifications = $request->user()->notifications()->latest()->take(8)->get();
+
+        return response()->json([
+            'unread_count' => $request->user()->unreadNotifications()->count(),
+            'notifications' => $notifications->map(fn ($notification): array => [
+                'id' => $notification->id,
+                'title' => $notification->data['title'] ?? 'Notification',
+                'message' => $notification->data['message'] ?? '',
+                'is_unread' => $notification->read_at === null,
+                'created_at' => $notification->created_at->diffForHumans(),
+                'read_url' => route('dashboard.notifications.read-one', $notification->id),
+            ])->values(),
+        ]);
+    }
+
     public function markNotificationRead(Request $request, string $notification): RedirectResponse
     {
         $notification = $request->user()->notifications()->findOrFail($notification);
         $notification->markAsRead();
 
-        return redirect()->to($notification->data['url'] ?? route('dashboard'));
+        $destination = $notification->data['url'] ?? route('dashboard', absolute: false);
+
+        // Older notifications may contain the host that created them. Keep only
+        // their local path so LAN clients stay on the host they are using.
+        if (is_string($destination) && filter_var($destination, FILTER_VALIDATE_URL)) {
+            $parts = parse_url($destination);
+            $destination = ($parts['path'] ?? '/').(isset($parts['query']) ? '?'.$parts['query'] : '');
+        }
+
+        return redirect()->to($destination);
     }
 
     public function deleteNotifications(Request $request): RedirectResponse
@@ -528,6 +604,12 @@ class DashboardController extends Controller
 
         return back()->with('success', 'All notifications deleted.');
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Authorization Helpers
+    |--------------------------------------------------------------------------
+    */
 
     private function ensureAdmin(Request $request): void
     {

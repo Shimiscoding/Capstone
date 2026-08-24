@@ -7,6 +7,7 @@ use App\Services\Settings;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Password as PasswordBroker;
 use Illuminate\Support\Facades\RateLimiter;
@@ -16,13 +17,18 @@ use Illuminate\View\View;
 
 class AuthController extends Controller
 {
-    public function showLogin(): View
+    public function showLogin(Settings $settings): Response
     {
-        return view('auth.login');
+        return response()
+            ->view('auth.login', ['adminSignupEnabled' => (bool) $settings->get('security.admin_signup_enabled', true)])
+            ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+            ->header('Pragma', 'no-cache');
     }
 
-    public function showRegister(): View
+    public function showRegister(Settings $settings): View
     {
+        abort_unless($settings->get('security.admin_signup_enabled', true), 404);
+
         return view('auth.register');
     }
 
@@ -100,6 +106,14 @@ class AuthController extends Controller
             ->orWhere('username', $attributes['login'])
             ->first();
 
+        if ($user && in_array($user->effectiveAccountStatus(), [User::STATUS_INACTIVE, User::STATUS_SUSPENDED, User::STATUS_BANNED], true)) {
+            RateLimiter::hit($key, 60);
+
+            return back()
+                ->withErrors(['login' => 'This account is '.$user->effectiveAccountStatus().'. Contact an administrator for assistance.'])
+                ->onlyInput('login');
+        }
+
         if (! $user || ! Auth::attempt(['id' => $user->id, 'password' => $attributes['password']], $request->boolean('remember'))) {
             RateLimiter::hit($key, 60);
 
@@ -115,8 +129,10 @@ class AuthController extends Controller
         return redirect()->intended(route('dashboard'));
     }
 
-    public function register(Request $request): RedirectResponse
+    public function register(Request $request, Settings $settings): RedirectResponse
     {
+        abort_unless($settings->get('security.admin_signup_enabled', true), 404);
+
         $attributes = $request->validate([
             'fullName' => ['sometimes', 'string', 'max:255'],
             'firstName' => ['required_without:fullName', 'string', 'max:100'],
@@ -127,6 +143,10 @@ class AuthController extends Controller
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'confirmed', Password::min(app(Settings::class)->get('security.password_min_length', 8))],
         ]);
+
+        // Public registration is reserved for administrator accounts. Never
+        // accept a role from the request, so it cannot be changed client-side.
+        $attributes['role'] = User::ROLE_ADMIN;
 
         $user = User::create($attributes);
 

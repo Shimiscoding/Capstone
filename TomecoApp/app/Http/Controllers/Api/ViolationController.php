@@ -20,7 +20,7 @@ class ViolationController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'driver_name' => ['required', 'string', 'max:255'],
+            'motorist_name' => ['required', 'string', 'max:255'],
             'license_number' => ['nullable', 'string', 'max:100'],
             'plate_number' => ['required', 'string', 'max:50'],
             'violation_type' => ['required', 'string', 'max:255'],
@@ -50,7 +50,7 @@ class ViolationController extends Controller
         Violation $violation
     ): JsonResponse {
         $validated = $request->validate([
-            'driver_name' => ['sometimes', 'required', 'string'],
+            'motorist_name' => ['sometimes', 'required', 'string'],
             'license_number' => ['nullable', 'string'],
             'plate_number' => ['sometimes', 'required', 'string'],
             'violation_type' => ['sometimes', 'required', 'string'],

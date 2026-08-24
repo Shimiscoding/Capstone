@@ -9,15 +9,14 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->string('plateNumber', 50)->nullable()->unique()->after('driverLicense');
+            $table->string('account_status', 20)->default('active')->after('role');
         });
     }
 
     public function down(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->dropUnique(['plateNumber']);
-            $table->dropColumn('plateNumber');
+            $table->dropColumn('account_status');
         });
     }
 };
