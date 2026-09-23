@@ -6,6 +6,7 @@ use App\Models\EnforcerAttendance;
 use App\Models\SupervisorAttendance;
 use App\Models\User;
 use App\Notifications\AttendanceTimeOutUpdated;
+use App\Services\OfficerLocationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -72,6 +73,9 @@ class AdminAttendanceController extends Controller
         abort_if($timeOut->lte($timeIn), 422, 'Time Out must be after Time In and cannot be the same time.');
 
         $attendance->update(['time_in' => $timeIn, 'time_out' => $timeOut]);
+        if ($attendance instanceof EnforcerAttendance && ! $attendance->user->isOnDuty()) {
+            app(OfficerLocationService::class)->stopSharing($attendance->user);
+        }
         $staff = $attendance->user;
         $notification = new AttendanceTimeOutUpdated(
             $staff->fullName,

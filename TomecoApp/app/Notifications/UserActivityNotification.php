@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Notification;
 
@@ -24,13 +25,18 @@ class UserActivityNotification extends Notification
     public function toArray(object $notifiable): array
     {
         $wasDeleted = $this->action === 'deleted';
+        $routeName = match ($this->userRole) {
+            User::ROLE_OFFICER => 'dashboard.users.enforcers',
+            User::ROLE_ADMIN => 'dashboard.users.admins',
+            default => 'dashboard.users.supervisors',
+        };
 
         return [
             'title' => $wasDeleted ? 'User account deleted' : 'User account updated',
             'message' => $this->userName.' ('.ucfirst($this->userRole).') was '.$this->action.'.',
             'url' => $wasDeleted
-                ? route('dashboard.users', absolute: false)
-                : route('dashboard.users', ['search' => $this->userName], false),
+                ? route($routeName, absolute: false)
+                : route($routeName, ['search' => $this->userName], false),
         ];
     }
 }

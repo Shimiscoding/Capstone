@@ -70,4 +70,24 @@ class UserAttendanceRestrictionsTest extends TestCase
 
         $this->assertSame(0, SupervisorAttendance::where('user_id', $supervisor->id)->count());
     }
+
+    public function test_supervisor_cannot_record_attendance_until_an_admin_sets_restrictions(): void
+    {
+        $supervisor = User::factory()->create([
+            'role' => User::ROLE_SUPERVISOR,
+            'attendance_restrictions_enabled' => false,
+        ]);
+
+        $this->actingAs($supervisor)->get(route('dashboard'))
+            ->assertOk()
+            ->assertSeeText('Schedule not set')
+            ->assertSeeText('Ask an administrator to set your attendance schedule');
+
+        $this->actingAs($supervisor)->post(route('supervisor.time-in'))
+            ->assertSessionHas('attendance_error', 'Your attendance schedule has not been set. Please contact an administrator.');
+        $this->actingAs($supervisor)->post(route('supervisor.time-out'))
+            ->assertSessionHas('attendance_error', 'Your attendance schedule has not been set. Please contact an administrator.');
+
+        $this->assertDatabaseMissing('supervisor_attendances', ['user_id' => $supervisor->id]);
+    }
 }

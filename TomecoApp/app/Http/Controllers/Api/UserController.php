@@ -38,6 +38,7 @@ class UserController extends Controller
             'email' => ['sometimes', 'required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user)],
             'role' => ['sometimes', Rule::in(User::ROLES)],
             'password' => ['sometimes', 'required', Password::min(8)],
+            'signature' => ['sometimes', 'nullable', 'string', 'max:7000000'],
         ]);
 
         $user->update($validated);

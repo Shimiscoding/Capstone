@@ -1,4 +1,4 @@
-@extends('layouts.dashboard')
+@extends('layouts.supervisor-dashboard')
 
 @section('title', 'Enforcer Attendance')
 @section('activePage', 'enforcer-attendance')

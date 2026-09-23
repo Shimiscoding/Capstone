@@ -3,21 +3,23 @@
 namespace App\Models;
 
 use Database\Factories\UserFactory;
-use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Foundation\Auth\User as Authenticatable;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
-class User extends Authenticatable implements MustVerifyEmail
+class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, Notifiable;
 
     public const ROLE_ADMIN = 'admin';
+
     public const ROLE_OFFICER = 'officer';
+
     public const ROLE_SUPERVISOR = 'supervisor';
 
     public const ROLES = [
@@ -27,9 +29,13 @@ class User extends Authenticatable implements MustVerifyEmail
     ];
 
     public const STATUS_ACTIVE = 'active';
+
     public const STATUS_PENDING = 'pending';
+
     public const STATUS_INACTIVE = 'inactive';
+
     public const STATUS_SUSPENDED = 'suspended';
+
     public const STATUS_BANNED = 'banned';
 
     public const ACCOUNT_STATUSES = [
@@ -49,9 +55,9 @@ class User extends Authenticatable implements MustVerifyEmail
         'username',
         'address',
         'area',
-        'barangay',
         'supervisor_id',
         'phoneNumber',
+        'signature',
         'email',
         'role',
         'account_status',
@@ -67,7 +73,6 @@ class User extends Authenticatable implements MustVerifyEmail
     protected $hidden = [
         'password',
         'remember_token',
-        'email_verification_otp',
     ];
 
     protected $appends = ['fullName'];
@@ -75,12 +80,10 @@ class User extends Authenticatable implements MustVerifyEmail
     protected function casts(): array
     {
         return [
-            'email_verified_at' => 'datetime',
-            'email_verification_otp_expires_at' => 'datetime',
-            'email_verification_otp_sent_at' => 'datetime',
             'password' => 'hashed',
             'attendance_restrictions_enabled' => 'boolean',
             'attendance_working_days' => 'array',
+            'signature' => 'encrypted',
         ];
     }
 
@@ -130,7 +133,7 @@ class User extends Authenticatable implements MustVerifyEmail
             return $this->account_status;
         }
 
-        return $this->hasVerifiedEmail() ? self::STATUS_ACTIVE : self::STATUS_PENDING;
+        return $this->account_status ?: self::STATUS_ACTIVE;
     }
 
     public function supervisor(): BelongsTo
@@ -161,5 +164,21 @@ class User extends Authenticatable implements MustVerifyEmail
     public function violations(): HasMany
     {
         return $this->hasMany(Violation::class);
+    }
+
+    public function currentLocation(): HasOne
+    {
+        return $this->hasOne(OfficerLocation::class);
+    }
+
+    public function locationHistory(): HasMany
+    {
+        return $this->hasMany(OfficerLocationHistory::class);
+    }
+
+    public function isOnDuty(): bool
+    {
+        return $this->isOfficer() && $this->enforcerAttendances()
+            ->whereNotNull('time_in')->whereNull('time_out')->exists();
     }
 }

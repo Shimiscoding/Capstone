@@ -1,4 +1,4 @@
-@extends('layouts.dashboard')
+@extends('layouts.supervisor-dashboard')
 
 @section('title', 'My Team')
 @section('activePage', 'supervisor-team')
@@ -46,9 +46,9 @@
                                 </td>
                                 <td>{{ $enforcer->phoneNumber ?: '—' }}</td>
                                 <td class="location-cell"
-                                    title="{{ collect([$enforcer->barangay, $enforcer->area, $enforcer->address])->filter()->join(', ') }}">
-                                    <strong>{{ $enforcer->barangay ?: '—' }}</strong><small
-                                        class="location-truncate">{{ collect([$enforcer->area, $enforcer->address])->filter()->join(', ') ?:'No address' }}</small>
+                                    title="{{ collect([$enforcer->area, $enforcer->address])->filter()->join(', ') }}">
+                                    <strong>{{ $enforcer->area ?: '—' }}</strong><small
+                                        class="location-truncate">{{ $enforcer->address ?: 'No address' }}</small>
                                 </td>
                                 <td>
                                     <form method="POST" action="{{ route('supervisor.team.remove', $enforcer) }}"
@@ -99,9 +99,9 @@
                             </td>
                             <td>{{ $enforcer->phoneNumber ?: '—' }}</td>
                             <td class="location-cell"
-                                title="{{ collect([$enforcer->barangay, $enforcer->area, $enforcer->address])->filter()->join(', ') }}">
-                                <strong>{{ $enforcer->barangay ?: '—' }}</strong><small
-                                    class="location-truncate">{{ collect([$enforcer->area, $enforcer->address])->filter()->join(', ') ?:'No address' }}</small>
+                                title="{{ collect([$enforcer->area, $enforcer->address])->filter()->join(', ') }}">
+                                <strong>{{ $enforcer->area ?: '—' }}</strong><small
+                                    class="location-truncate">{{ $enforcer->address ?: 'No address' }}</small>
                             </td>
                             <td>
                                 <form method="POST" action="{{ route('supervisor.team.assign', $enforcer) }}">@csrf<button

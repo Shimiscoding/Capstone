@@ -1,4 +1,4 @@
-@extends('layouts.dashboard')
+@extends('layouts.admin-dashboard')
 
 @section('title', $sectionLabel . ' Details')
 @section('activePage', 'users-' . $section)
@@ -52,10 +52,6 @@
                     </dd>
                 </div>
             @endif
-            <div>
-                <dt>Barangay</dt>
-                <dd>{{ $staffUser->barangay ?: '—' }}</dd>
-            </div>
             <div>
                 <dt>Area</dt>
                 <dd>{{ $staffUser->area ?: '—' }}</dd>

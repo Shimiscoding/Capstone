@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\EmailOtpVerificationController;
 use App\Models\User;
 use App\Services\Settings;
 use Illuminate\Http\RedirectResponse;
@@ -29,25 +28,16 @@ class ProfileController extends Controller
             'username' => ['required', 'string', 'max:100', 'regex:/^[A-Za-z0-9._-]+$/', Rule::unique('users', 'username')->ignore($user)],
             'address' => ['required', 'string', 'max:255'],
             'area' => ['required', 'string', 'max:100'],
-            'barangay' => ['required', 'string', 'max:100'],
             'phoneNumber' => ['required', 'string', 'regex:/^09\d{9}$/', Rule::unique('users', 'phoneNumber')->ignore($user)],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user)],
             'password' => ['nullable', 'confirmed', 'min:'.app(Settings::class)->get('security.password_min_length', 8)],
         ]);
 
-        $emailChanged = $attributes['email'] !== $user->email;
         if (blank($attributes['password'] ?? null)) {
             unset($attributes['password']);
         }
 
         $user->update($attributes);
-
-        if ($emailChanged) {
-            $user->forceFill(['email_verified_at' => null])->save();
-            EmailOtpVerificationController::sendOtp($user);
-
-            return redirect()->route('verification.notice')->with('status', 'Verify your new email address to continue.');
-        }
 
         return back()->with('success', 'Profile updated successfully.');
     }

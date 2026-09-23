@@ -17,6 +17,12 @@ class EnforcerAttendanceTest extends TestCase
         $enforcer = User::factory()->create([
             'role' => User::ROLE_OFFICER,
             'supervisor_id' => $supervisor->id,
+            'attendance_restrictions_enabled' => true,
+            'attendance_time_in_start' => '00:00',
+            'attendance_time_in_end' => '23:59',
+            'attendance_time_out_start' => '00:00',
+            'attendance_time_out_end' => '23:59',
+            'attendance_working_days' => ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
         ]);
 
         $this->actingAs($supervisor)->post(route('supervisor.enforcers.time-in', $enforcer))->assertRedirect();

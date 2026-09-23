@@ -1,4 +1,4 @@
-@extends('layouts.dashboard')
+@extends('layouts.admin-dashboard')
 
 @section('title', 'Dashboard')
 @section('activePage', 'dashboard')
@@ -24,7 +24,7 @@
                 <strong>{{ number_format($totalTickets) }}</strong><span>{{ number_format($outstandingTickets) }} unpaid or pending</span>
             </div>
         </a>
-        <a class="overview-card" href="{{ auth()->user()->isAdmin() ? route('dashboard.users') : route('profile.edit') }}">
+        <a class="overview-card" href="{{ auth()->user()->isAdmin() ? route('dashboard.users.supervisors') : route('profile.edit') }}">
             <div class="overview-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
                     <circle cx="12" cy="8" r="4" />
                     <path d="M4 21a8 8 0 0 1 16 0" />
@@ -35,7 +35,8 @@
         </a>
     </div>
 
-    <section class="dashboard-panel home-analytics-panel">
+    <div class="analytics-graph-grid home-analytics-grid">
+    <section class="dashboard-panel home-analytics-panel analytics-chart-card">
         <div class="panel-heading">
             <div>
                 <h2>Activity overview</h2>
@@ -45,6 +46,7 @@
         <div class="chartjs-container home-chart-container"><canvas id="homeAnalyticsChart"
                 aria-label="Seven-day activity overview" role="img"></canvas></div>
     </section>
+    </div>
 
     <div class="home-content-grid">
         <section class="dashboard-panel">
@@ -57,7 +59,7 @@
             <div class="recent-list">
                 @forelse ($recentViolations as $violation)
                     <div class="recent-user"><span class="table-avatar">T</span><span
-                            class="recent-details"><strong>{{ $violation->violation_type }}</strong><small>{{ $violation->motorist_name }}
+                            class="recent-details"><strong>{{ $violation->violation_type }}</strong><small>{{ $violation->full_name }}
                                 &middot; {{ $violation->plate_number }} &middot;
                                 &#8369;{{ number_format($violation->fine_amount, 2) }}</small></span><span
                             class="recent-date">{{ ucfirst($violation->status) }}<br>{{ $violation->created_at?->format('M d, Y') }}</span>
@@ -76,7 +78,7 @@
             </div>
             <a class="quick-action" href="{{ route('dashboard.violation-records') }}"><span>Review tickets</span><b>&rarr;</b></a>
             @if (auth()->user()->isAdmin())
-                <a class="quick-action" href="{{ route('dashboard.users') }}"><span>Manage users</span><b>&rarr;</b></a>
+                <a class="quick-action" href="{{ route('dashboard.users.supervisors') }}"><span>Manage users</span><b>&rarr;</b></a>
             @endif
             <a class="quick-action" href="{{ route('profile.edit') }}"><span>Update my profile</span><b>&rarr;</b></a>
         </aside>
@@ -107,8 +109,8 @@
                         {
                             label: 'Users',
                             data: @json($activityDays->pluck('users')),
-                            borderColor: '#52604d',
-                            backgroundColor: 'transparent',
+                            borderColor: '#2563eb',
+                            backgroundColor: 'rgba(37, 99, 235, .08)',
                             tension: .3,
                             borderWidth: 2
                         }
@@ -138,6 +140,7 @@
                     }
                 }
             });
+
         })();
     </script>
 @endpush

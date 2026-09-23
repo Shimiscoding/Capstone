@@ -1,4 +1,4 @@
-@extends('layouts.dashboard')
+@extends(auth()->user()->isAdmin() ? 'layouts.admin-dashboard' : 'layouts.supervisor-dashboard')
 
 @section('title', $enforcer->fullName . ' Attendance')
 @section('activePage', auth()->user()->isAdmin() ? 'attendance' : 'enforcer-attendance')
@@ -32,7 +32,9 @@
                     <tr>
                         <th>Date</th>
                         <th>Time In</th>
+                        <th>Time In Location</th>
                         <th>Time Out</th>
+                        <th>Time Out Location</th>
                         <th>Total Hours</th>
                         <th>Status</th>
                         @if (auth()->user()->isAdmin())
@@ -45,7 +47,23 @@
                         <tr>
                             <td>{{ $attendance->attendance_date->format('l, M d, Y') }}</td>
                             <td>{{ $attendance->time_in?->format('h:i:s A') ?? '—' }}</td>
+                            <td>
+                                @if ($attendance->time_in_latitude !== null && $attendance->time_in_longitude !== null)
+                                    <a href="https://www.google.com/maps?q={{ $attendance->time_in_latitude }},{{ $attendance->time_in_longitude }}"
+                                        target="_blank" rel="noopener noreferrer">Open map</a>
+                                @else
+                                    <span>Unavailable</span>
+                                @endif
+                            </td>
                             <td>{{ $attendance->time_out?->format('h:i:s A') ?? '—' }}</td>
+                            <td>
+                                @if ($attendance->time_out_latitude !== null && $attendance->time_out_longitude !== null)
+                                    <a href="https://www.google.com/maps?q={{ $attendance->time_out_latitude }},{{ $attendance->time_out_longitude }}"
+                                        target="_blank" rel="noopener noreferrer">Open map</a>
+                                @else
+                                    <span>Unavailable</span>
+                                @endif
+                            </td>
                             <td>{{ $attendance->time_in && $attendance->time_out ? number_format($attendance->time_in->diffInMinutes($attendance->time_out) / 60, 2) . ' hrs' : '—' }}
                             </td>
                             <td><span
@@ -74,7 +92,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="{{ auth()->user()->isAdmin() ? 6 : 5 }}" class="empty-state"><strong>No timestamp records</strong><span>This enforcer
+                            <td colspan="{{ auth()->user()->isAdmin() ? 8 : 7 }}" class="empty-state"><strong>No timestamp records</strong><span>This enforcer
                                     has not recorded attendance yet.</span></td>
                         </tr>
                     @endforelse

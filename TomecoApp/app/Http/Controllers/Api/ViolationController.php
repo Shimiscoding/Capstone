@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Violation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 class ViolationController extends Controller
 {
@@ -20,14 +21,24 @@ class ViolationController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'motorist_name' => ['required', 'string', 'max:255'],
+            'first_name' => ['required', 'string', 'max:100'],
+            'middle_name' => ['nullable', 'string', 'max:100'],
+            'last_name' => ['required', 'string', 'max:100'],
             'license_number' => ['nullable', 'string', 'max:100'],
+            'license_type' => ['nullable', 'string', 'in:professional,non_professional,student_permit'],
             'plate_number' => ['required', 'string', 'max:50'],
+            'vehicle_type' => ['required', 'string', 'max:50'],
+            'or_number' => ['nullable', 'string', 'max:100'],
+            'cr_number' => ['nullable', 'string', 'max:100'],
             'violation_type' => ['required', 'string', 'max:255'],
             'fine_amount' => ['required', 'numeric', 'min:0'],
             'location' => ['nullable', 'string'],
+            'signature' => ['required', 'string', 'max:7000000'],
         ]);
 
+        $validated['enforcer_id'] = $request->user()->id;
+        $validated['enforcer_name'] = $request->user()->fullName;
+        $validated['vehicle_type'] = Str::title(trim($validated['vehicle_type']));
         $violation = Violation::create($validated);
 
         return response()->json([
@@ -50,15 +61,25 @@ class ViolationController extends Controller
         Violation $violation
     ): JsonResponse {
         $validated = $request->validate([
-            'motorist_name' => ['sometimes', 'required', 'string'],
+            'first_name' => ['sometimes', 'required', 'string', 'max:100'],
+            'middle_name' => ['nullable', 'string', 'max:100'],
+            'last_name' => ['sometimes', 'required', 'string', 'max:100'],
             'license_number' => ['nullable', 'string'],
+            'license_type' => ['nullable', 'string', 'in:professional,non_professional,student_permit'],
             'plate_number' => ['sometimes', 'required', 'string'],
+            'vehicle_type' => ['sometimes', 'required', 'string', 'max:50'],
+            'or_number' => ['nullable', 'string', 'max:100'],
+            'cr_number' => ['nullable', 'string', 'max:100'],
             'violation_type' => ['sometimes', 'required', 'string'],
             'fine_amount' => ['sometimes', 'required', 'numeric'],
             'status' => ['sometimes', 'string'],
             'location' => ['nullable', 'string'],
+            'signature' => ['sometimes', 'required', 'string', 'max:7000000'],
         ]);
 
+        if (array_key_exists('vehicle_type', $validated)) {
+            $validated['vehicle_type'] = Str::title(trim($validated['vehicle_type']));
+        }
         $violation->update($validated);
 
         return response()->json([

@@ -3,6 +3,12 @@
 namespace App\Providers;
 
 use App\Models\Setting;
+use App\Models\AuditLog;
+use App\Services\AuditLogger;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
 use Throwable;
@@ -22,6 +28,15 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        foreach (['created', 'updated', 'deleted'] as $event) {
+            Event::listen("eloquent.{$event}: *", function (string $eventName, array $models) use ($event): void {
+                $model = $models[0] ?? null;
+                if ($model && ! $model instanceof AuditLog) AuditLogger::record($model, $event);
+            });
+        }
+
+        RateLimiter::for('officer-location', fn (Request $request) => Limit::perMinute(30)->by($request->user()?->id ?: $request->ip()));
+
         try {
             if (Schema::hasTable('settings')) {
                 $runtime = Setting::whereIn('key', ['general.organization_name', 'general.timezone', 'security.session_timeout'])->pluck('value', 'key');

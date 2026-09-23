@@ -33,6 +33,10 @@ class SupervisorAttendanceController extends Controller
     {
         abort_unless($request->user()->isSupervisor(), 403);
 
+        if ($error = $rules->timeOutError($request->user())) {
+            return back()->with('attendance_error', $error);
+        }
+
         $attendance = SupervisorAttendance::where('user_id', $request->user()->id)
             ->whereDate('attendance_date', today())
             ->first();
@@ -43,10 +47,6 @@ class SupervisorAttendanceController extends Controller
         if ($attendance->time_out) {
             return back()->with('attendance_error', 'You have already timed out today.');
         }
-        if ($error = $rules->timeOutError($request->user())) {
-            return back()->with('attendance_error', $error);
-        }
-
         $attendance->update(['time_out' => now()]);
 
         return back()->with('attendance_success', 'Time out recorded successfully.');

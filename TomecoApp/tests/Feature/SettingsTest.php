@@ -32,12 +32,25 @@ class SettingsTest extends TestCase
         $this->actingAs($officer)->get(route('dashboard.settings'))->assertForbidden();
     }
 
-    public function test_admin_can_download_a_json_backup(): void
+    public function test_roles_and_permissions_only_show_administrator_and_supervisor(): void
     {
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
 
-        $this->actingAs($admin)->get(route('dashboard.settings.backup'))
-            ->assertOk()->assertHeader('content-type', 'application/json')->assertSee('violations');
+        $this->actingAs($admin)
+            ->get(route('dashboard.settings', ['tab' => 'permissions']))
+            ->assertOk()
+            ->assertSeeText('Administrator')
+            ->assertSeeText('Supervisor')
+            ->assertDontSeeText('Officer');
+
+        $this->actingAs($admin)->put(route('dashboard.settings.update'), [
+            'section' => 'permissions',
+            'admin' => ['manage_settings', 'manage_users'],
+            'supervisor' => ['record_violations', 'export'],
+        ])->assertRedirect(route('dashboard.settings', ['tab' => 'permissions']));
+
+        $this->assertDatabaseHas('settings', ['key' => 'permissions.supervisor']);
+        $this->assertDatabaseMissing('settings', ['key' => 'permissions.officer']);
     }
 
     public function test_admin_can_disable_public_admin_signup(): void

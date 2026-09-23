@@ -1,4 +1,4 @@
-@extends('layouts.dashboard')
+@extends('layouts.admin-dashboard')
 @section('title', 'Settings')
 @section('activePage', 'settings')
 
@@ -11,7 +11,6 @@
             'notifications' => 'Notifications',
             'data' => 'Import & Export',
             'security' => 'Security',
-            'maintenance' => 'Backup & Maintenance',
         ];
         $activeTab = array_key_exists($activeTab, $tabs) ? $activeTab : 'general';
         $get = fn($key, $fallback = '') => old($key, $settings[$activeTab . '.' . $key] ?? $fallback);
@@ -114,7 +113,7 @@
                                 'export' => 'Export reports',
                             ];
                         @endphp
-                        @foreach (['admin' => 'Administrator', 'officer' => 'Officer'] as $role => $roleLabel)
+                        @foreach (['admin' => 'Administrator', 'supervisor' => 'Supervisor'] as $role => $roleLabel)
                             <fieldset class="permission-group">
                                 <legend>{{ $roleLabel }}</legend>
                                 @foreach ($permissions as $permission => $label)
@@ -181,23 +180,6 @@
                                 @checked($checked('admin_signup_enabled'))>
                             <span>Allow admin signup <small>Shows “Sign up as admin” on the login page. Turn this off after creating the required administrator account.</small></span>
                         </label>
-                    @else
-                        <label class="toggle-field wide">
-                            <input type="checkbox" name="enabled" value="1" @checked($checked('enabled'))>
-                            <span>Show maintenance notice</span>
-                        </label>
-                        <label>
-                            <span>Data retention (days)</span>
-                            <input type="number" name="data_retention_days" value="{{ $get('data_retention_days') }}">
-                        </label>
-                        <label>
-                            <span>Backup frequency</span>
-                            <select name="backup_frequency">
-                                @foreach (['manual', 'daily', 'weekly', 'monthly'] as $frequency)
-                                    <option @selected($get('backup_frequency') === $frequency)>{{ ucfirst($frequency) }}</option>
-                                @endforeach
-                            </select>
-                        </label>
                     @endif
                 </div>
                 <div class="settings-actions">
@@ -205,16 +187,6 @@
                 </div>
             </form>
 
-            @if ($activeTab === 'maintenance')
-                <div class="maintenance-actions">
-                    <a href="{{ route('dashboard.settings.backup') }}">Download database backup</a>
-
-                    <form method="POST" action="{{ route('dashboard.settings.clear-cache') }}">
-                        @csrf
-                        <button type="submit">Clear application cache</button>
-                    </form>
-                </div>
-            @endif
         </section>
     </div>
 @endsection

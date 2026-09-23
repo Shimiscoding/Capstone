@@ -21,10 +21,16 @@ class UserCreatedNotification extends Notification
 
     public function toArray(object $notifiable): array
     {
+        $routeName = match ($this->createdUser->role) {
+            User::ROLE_OFFICER => 'dashboard.users.enforcers',
+            User::ROLE_ADMIN => 'dashboard.users.admins',
+            default => 'dashboard.users.supervisors',
+        };
+
         return [
             'title' => 'New user registered',
             'message' => $this->createdUser->fullName.' was added as '.ucfirst($this->createdUser->role).'.',
-            'url' => route('dashboard.users', ['search' => $this->createdUser->fullName], false),
+            'url' => route($routeName, ['search' => $this->createdUser->fullName], false),
         ];
     }
 }

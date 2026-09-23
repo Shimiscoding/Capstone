@@ -1,4 +1,4 @@
-@extends('layouts.dashboard')
+@extends('layouts.supervisor-dashboard')
 
 @section('title', 'Supervisor Dashboard')
 @section('activePage', 'dashboard')
@@ -13,19 +13,48 @@
         <div class="dashboard-date">{{ now()->format('F d, Y') }}</div>
     </div>
 
+    @if (session('attendance_success'))
+        <div class="flash-alert is-success" role="status">{{ session('attendance_success') }}</div>
+    @endif
+    @if (session('attendance_error'))
+        <div class="flash-alert is-error" role="alert">{{ session('attendance_error') }}</div>
+    @endif
+
+    <section class="attendance-panel supervisor-attendance-panel" aria-labelledby="todayAttendanceTitle">
+        <div class="attendance-summary">
+            <div>
+                <p class="eyebrow">Today's attendance</p>
+                <h2 id="todayAttendanceTitle">Time In and Time Out</h2>
+                <span class="attendance-state {{ $todayAttendance?->time_out ? 'is-complete' : ($todayAttendance?->time_in ? 'is-active' : '') }}">
+                    {{ !$supervisor->attendance_restrictions_enabled ? 'Schedule not set' : ($todayAttendance?->time_out ? 'Completed' : ($todayAttendance?->time_in ? 'Currently timed in' : 'Not yet timed in')) }}
+                </span>
+                @unless ($supervisor->attendance_restrictions_enabled)
+                    <p class="attendance-setup-note">Ask an administrator to set your attendance schedule before recording attendance.</p>
+                @endunless
+            </div>
+            <div class="attendance-times" aria-label="Today's recorded times">
+                <div><span>Time In</span><strong>{{ $todayAttendance?->time_in?->format('h:i A') ?? '—' }}</strong></div>
+                <div><span>Time Out</span><strong>{{ $todayAttendance?->time_out?->format('h:i A') ?? '—' }}</strong></div>
+            </div>
+            <div class="attendance-actions">
+                <form method="POST" action="{{ route('supervisor.time-in') }}">
+                    @csrf
+                    <button type="submit" @disabled(!$supervisor->attendance_restrictions_enabled || $todayAttendance?->time_in)>Time In</button>
+                </form>
+                <form method="POST" action="{{ route('supervisor.time-out') }}">
+                    @csrf
+                    <button class="time-out-button" type="submit" @disabled(!$supervisor->attendance_restrictions_enabled || !$todayAttendance?->time_in || $todayAttendance?->time_out)>Time Out</button>
+                </form>
+            </div>
+        </div>
+    </section>
+
     <div class="overview-grid supervisor-overview-grid">
         <article class="overview-card overview-card-primary">
             <div class="overview-icon">E</div>
             <div>
                 <p>Assigned enforcers</p><strong>{{ number_format($enforcerCount) }}</strong><span>Members currently under
                     your supervision</span>
-            </div>
-        </article>
-        <article class="overview-card">
-            <div class="overview-icon">B</div>
-            <div>
-                <p>Barangays covered</p><strong>{{ number_format($barangayCount) }}</strong><span>Unique barangays
-                    represented by your team</span>
             </div>
         </article>
         <article class="overview-card">
@@ -51,7 +80,6 @@
                     <tr>
                         <th>Enforcer</th>
                         <th>Contact</th>
-                        <th>Barangay</th>
                         <th>Area and address</th>
                         <th>Status</th>
                     </tr>
@@ -65,7 +93,6 @@
                                 </div>
                             </td>
                             <td>{{ $enforcer->phoneNumber ?: '—' }}<br><small>{{ $enforcer->email }}</small></td>
-                            <td>{{ $enforcer->barangay ?: '—' }}</td>
                             <td class="location-cell"
                                 title="{{ collect([$enforcer->area, $enforcer->address])->filter()->join(', ') }}">
                                 <strong>{{ $enforcer->area ?: '—' }}</strong><small
@@ -74,7 +101,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="5" class="empty-state"><strong>No enforcers assigned yet</strong><span>Add an
+                            <td colspan="4" class="empty-state"><strong>No enforcers assigned yet</strong><span>Add an
                                     available enforcer from My Team.</span></td>
                         </tr>
                     @endforelse

@@ -26,7 +26,7 @@ class UserManagementTest extends TestCase
             'password_confirmation' => 'password123',
         ]);
 
-        $response->assertRedirect(route('dashboard.users'));
+        $response->assertRedirect(route('dashboard.users.enforcers'));
         $this->assertDatabaseHas('users', [
             'email' => 'enforcer-one@example.com',
             'role' => User::ROLE_OFFICER,
@@ -144,7 +144,7 @@ class UserManagementTest extends TestCase
     {
         $officer = User::factory()->create(['role' => User::ROLE_OFFICER]);
 
-        $this->actingAs($officer)->get(route('dashboard.users'))->assertForbidden();
+        $this->actingAs($officer)->get(route('dashboard.users.supervisors'))->assertForbidden();
         $this->actingAs($officer)->get(route('dashboard.users.create'))->assertForbidden();
     }
 
@@ -184,7 +184,7 @@ class UserManagementTest extends TestCase
             'email' => 'updated@example.com',
             'role' => User::ROLE_SUPERVISOR,
             'password' => '',
-        ])->assertRedirect(route('dashboard.users'));
+        ])->assertRedirect(route('dashboard.users.supervisors'));
 
         $this->assertDatabaseHas('users', [
             'id' => $user->id,
@@ -204,13 +204,6 @@ class UserManagementTest extends TestCase
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
         $supervisor = User::factory()->create(['role' => User::ROLE_SUPERVISOR]);
 
-        $allUsersEdit = $this->actingAs($admin)
-            ->get(route('dashboard.users.edit', ['user' => $supervisor, 'from' => 'users']))
-            ->assertOk()
-            ->assertSee('href="'.route('dashboard.users').'">Back', false)
-            ->assertSee('href="'.route('dashboard.users').'">Cancel', false)
-            ->assertDontSee('name="user_section"', false);
-
         $this->actingAs($admin)->put(route('dashboard.users.update', $supervisor), [
             'firstName' => $supervisor->firstName,
             'middleName' => $supervisor->middleName,
@@ -220,7 +213,7 @@ class UserManagementTest extends TestCase
             'email' => $supervisor->email,
             'role' => User::ROLE_SUPERVISOR,
             'password' => '',
-        ])->assertRedirect(route('dashboard.users'));
+        ])->assertRedirect(route('dashboard.users.supervisors'));
 
         $supervisorEdit = $this->actingAs($admin)
             ->get(route('dashboard.users.edit', ['user' => $supervisor, 'from' => 'supervisors']))
@@ -267,7 +260,7 @@ class UserManagementTest extends TestCase
 
         $this->actingAs($admin)
             ->delete(route('dashboard.users.destroy', $user))
-            ->assertRedirect(route('dashboard.users'));
+            ->assertRedirect(route('dashboard.users.enforcers'));
         $this->assertDatabaseMissing('users', ['id' => $user->id]);
         $this->assertDatabaseHas('notifications', [
             'notifiable_id' => $admin->id,
@@ -280,7 +273,7 @@ class UserManagementTest extends TestCase
         $this->assertDatabaseHas('users', ['id' => $admin->id]);
     }
 
-    public function test_admin_can_search_filter_and_sort_the_user_table(): void
+    public function test_admin_can_search_and_sort_role_specific_user_tables(): void
     {
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN, 'fullName' => 'System Administrator']);
         User::factory()->create(['role' => User::ROLE_SUPERVISOR, 'fullName' => 'Zelda Supervisor']);
@@ -288,32 +281,32 @@ class UserManagementTest extends TestCase
         User::factory()->create(['role' => User::ROLE_SUPERVISOR, 'fullName' => 'Juan Santos Dela Cruz']);
 
         $this->actingAs($admin)
-            ->get(route('dashboard.users', ['search' => 'Zelda']))
+            ->get(route('dashboard.users.supervisors', ['search' => 'Zelda']))
             ->assertOk()
             ->assertSee('Zelda Supervisor')
             ->assertDontSee('Aaron Enforcer');
 
         $this->actingAs($admin)
-            ->get(route('dashboard.users', ['search' => 'Santos']))
+            ->get(route('dashboard.users.supervisors', ['search' => 'Santos']))
             ->assertOk()
             ->assertSee('Juan Santos Dela Cruz');
 
         $this->actingAs($admin)
-            ->get(route('dashboard.users', ['search' => 'Juan Cruz']))
+            ->get(route('dashboard.users.supervisors', ['search' => 'Juan Cruz']))
             ->assertOk()
             ->assertSee('Juan Santos Dela Cruz')
             ->assertDontSee('Zelda Supervisor');
 
         $this->actingAs($admin)
-            ->get(route('dashboard.users', ['role' => User::ROLE_OFFICER]))
+            ->get(route('dashboard.users.enforcers'))
             ->assertOk()
             ->assertSee('Aaron Enforcer')
             ->assertDontSee('Zelda Supervisor');
 
         $this->actingAs($admin)
-            ->get(route('dashboard.users', ['sort' => 'name_asc']))
+            ->get(route('dashboard.users.supervisors', ['sort' => 'name_asc']))
             ->assertOk()
-            ->assertSeeInOrder(['Aaron Enforcer', 'System Administrator', 'Zelda Supervisor']);
+            ->assertSeeInOrder(['Juan Santos Dela Cruz', 'Zelda Supervisor']);
     }
 
     public function test_non_admin_cannot_update_or_delete_users(): void
@@ -341,27 +334,23 @@ class UserManagementTest extends TestCase
         ])->assertSessionHasErrors('phoneNumber');
     }
 
-    public function test_admin_can_create_a_verified_demo_account_without_an_email(): void
+    public function test_email_is_required_when_creating_a_user(): void
     {
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
 
         $this->actingAs($admin)->post(route('dashboard.users.store'), [
-            'firstName' => 'Demo',
+            'firstName' => 'Test',
             'lastName' => 'Admin',
-            'username' => 'demo.admin',
-            'address' => 'Demo Street',
-            'area' => 'Demo Area',
-            'barangay' => 'Demo Barangay',
+            'username' => 'test.admin',
+            'address' => 'Test Street',
+            'area' => 'Test Area',
             'phoneNumber' => '09178889999',
             'role' => User::ROLE_ADMIN,
-            'demo_account' => '1',
             'password' => 'password123',
             'password_confirmation' => 'password123',
-        ])->assertRedirect(route('dashboard.users'));
+        ])->assertSessionHasErrors('email');
 
-        $demo = User::where('username', 'demo.admin')->firstOrFail();
-        $this->assertSame('demo.admin@demo.com', $demo->email);
-        $this->assertNotNull($demo->email_verified_at);
+        $this->assertDatabaseMissing('users', ['username' => 'test.admin']);
     }
 
     public function test_supervisor_details_show_only_their_assigned_enforcers(): void
@@ -470,6 +459,9 @@ class UserManagementTest extends TestCase
             ->get(route('dashboard'))
             ->assertOk()
             ->assertSee('Supervisor workspace')
+            ->assertSee('Time In and Time Out')
+            ->assertSee(route('supervisor.time-in'))
+            ->assertSee(route('supervisor.time-out'))
             ->assertSee('Assigned Officer')
             ->assertDontSee('Manage users');
 
@@ -480,7 +472,15 @@ class UserManagementTest extends TestCase
 
     public function test_supervisor_can_time_in_and_time_out_only_once_per_day(): void
     {
-        $supervisor = User::factory()->create(['role' => User::ROLE_SUPERVISOR]);
+        $supervisor = User::factory()->create([
+            'role' => User::ROLE_SUPERVISOR,
+            'attendance_restrictions_enabled' => true,
+            'attendance_time_in_start' => '00:00',
+            'attendance_time_in_end' => '23:59',
+            'attendance_time_out_start' => '00:00',
+            'attendance_time_out_end' => '23:59',
+            'attendance_working_days' => ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
+        ]);
 
         $this->actingAs($supervisor)->post(route('supervisor.time-in'))->assertRedirect();
         $attendance = SupervisorAttendance::where('user_id', $supervisor->id)->firstOrFail();

@@ -114,6 +114,14 @@ class AuthController extends Controller
                 ->onlyInput('login');
         }
 
+        if ($user?->isOfficer()) {
+            RateLimiter::hit($key, 60);
+
+            return back()
+                ->withErrors(['login' => 'Enforcer accounts can only sign in through the mobile app.'])
+                ->onlyInput('login');
+        }
+
         if (! $user || ! Auth::attempt(['id' => $user->id, 'password' => $attributes['password']], $request->boolean('remember'))) {
             RateLimiter::hit($key, 60);
 
@@ -153,9 +161,7 @@ class AuthController extends Controller
         Auth::login($user);
         $request->session()->regenerate();
 
-        EmailOtpVerificationController::sendOtp($user);
-
-        return redirect()->route('verification.notice');
+        return redirect()->route('dashboard');
     }
 
     public function logout(Request $request): RedirectResponse

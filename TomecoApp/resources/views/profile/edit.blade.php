@@ -1,4 +1,4 @@
-@extends('layouts.dashboard')
+@extends(auth()->user()->isSupervisor() ? 'layouts.supervisor-dashboard' : 'layouts.admin-dashboard')
 
 @section('title', 'My Profile')
 @section('activePage', 'profile')
@@ -73,16 +73,10 @@
                         <small class="field-error">{{ $message }}</small>
                     @enderror
                 </div>
-                <div class="form-field"><label for="barangay">Barangay <b>Required</b></label><input id="barangay"
-                        name="barangay" value="{{ old('barangay', $profileUser->barangay) }}" required>
-                    @error('barangay')
-                        <small class="field-error">{{ $message }}</small>
-                    @enderror
-                </div>
                 <div class="form-section-heading"><span>2</span>
                     <div>
                         <h2>Contact and security</h2>
-                        <p>Changing your email requires verification of the new address.</p>
+                        <p>Keep your contact details and account credentials up to date.</p>
                     </div>
                 </div>
                 <div class="form-field"><label for="phoneNumber">Phone number <b>Required</b></label><input id="phoneNumber"

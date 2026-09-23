@@ -1,4 +1,4 @@
-@extends('layouts.dashboard')
+@extends('layouts.admin-dashboard')
 
 @php
     $sectionLabel = match ($userSection ?? null) {
@@ -14,13 +14,13 @@
             \App\Models\User::ROLE_SUPERVISOR => route('dashboard.users.supervisors.show', $editedUser),
             \App\Models\User::ROLE_OFFICER => route('dashboard.users.enforcers.show', $editedUser),
             \App\Models\User::ROLE_ADMIN => route('dashboard.users.admins.show', $editedUser),
-            default => route('dashboard.users'),
+            default => route('dashboard.users.supervisors'),
         }
         : match ($userSection ?? null) {
             'supervisors' => route('dashboard.users.supervisors'),
             'enforcers' => route('dashboard.users.enforcers'),
             'admins' => route('dashboard.users.admins'),
-            default => route('dashboard.users'),
+            default => route('dashboard.users.supervisors'),
         };
 @endphp
 @section('title', isset($editedUser) ? 'Edit User' : 'Create ' . $sectionLabel)
@@ -103,17 +103,10 @@
                         <small class="field-error">{{ $message }}</small>
                     @enderror
                 </div>
-                <div class="form-field"><label for="area">Area <b>Required</b></label><input id="area"
+                <div class="form-field"><label for="area">Area <em>Optional</em></label><input id="area"
                         name="area" type="text" value="{{ old('area', $editedUser->area ?? '') }}"
-                        placeholder="e.g., Area 1" required>
+                        placeholder="e.g., Area 1">
                     @error('area')
-                        <small class="field-error">{{ $message }}</small>
-                    @enderror
-                </div>
-                <div class="form-field"><label for="barangay">Barangay <b>Required</b></label><input id="barangay"
-                        name="barangay" type="text" value="{{ old('barangay', $editedUser->barangay ?? '') }}"
-                        placeholder="e.g., Barangay 12" required>
-                    @error('barangay')
                         <small class="field-error">{{ $message }}</small>
                     @enderror
                 </div>
@@ -158,14 +151,6 @@
                         <p>Provide working contact details and secure account credentials.</p>
                     </div>
                 </div>
-                <div class="form-field demo-account-field"><label for="demo_account"><input id="demo_account"
-                            name="demo_account" type="checkbox" value="1"
-                            @checked(old(
-                                    'demo_account',
-                                    isset($editedUser) &&
-                                        (str_ends_with($editedUser->email, '@demo.com') || str_ends_with($editedUser->email, '@demo.tomeco.local'))))><span><strong>{{ isset($editedUser) ? 'Use demo email' : 'Create as demo account' }}</strong><small
-                                class="field-help">Generates an easy username@demo.com email and skips email
-                                verification.</small></span></label></div>
                 <div class="form-field"><label for="phoneNumber">Phone number <b>Required</b></label><input
                         id="phoneNumber" name="phoneNumber" type="tel"
                         value="{{ old('phoneNumber', $editedUser->phoneNumber ?? '') }}" placeholder="e.g., 09171234567"
@@ -177,8 +162,7 @@
                             digits beginning with 09.</small>
                     @enderror
                 </div>
-                <div class="form-field"><label for="email">Email address <b
-                            id="emailRequiredHint">Required</b></label><input id="email" name="email"
+                <div class="form-field"><label for="email">Email address <b>Required</b></label><input id="email" name="email"
                         type="email" value="{{ old('email', $editedUser->email ?? '') }}"
                         placeholder="e.g., juan@example.com" autocomplete="email" required>
                     @error('email')
@@ -207,7 +191,7 @@
                             <option value="{{ $accountStatus }}" @selected(old('account_status', $editedUser->effectiveAccountStatus()) === $accountStatus)>{{ ucfirst($accountStatus) }}</option>
                         @endforeach
                     </select>
-                    @error('account_status')<small class="field-error">{{ $message }}</small>@else<small class="field-help">Pending requires verification; inactive, suspended, and banned accounts cannot sign in.</small>@enderror</div>
+                    @error('account_status')<small class="field-error">{{ $message }}</small>@else<small class="field-help">Inactive, suspended, and banned accounts cannot sign in.</small>@enderror</div>
                 @endisset
                 <div class="form-field"><label for="password_confirmation">Confirm password @if (isset($editedUser))
                         <em>Optional</em>@else<b>Required</b>
@@ -242,19 +226,6 @@
         }
         roleInput.addEventListener('change', syncRoleFields);
         syncRoleFields();
-        const demoAccountInput = document.getElementById('demo_account');
-        const emailInput = document.getElementById('email');
-
-        function syncDemoAccount() {
-            if (!demoAccountInput) return;
-            const isDemo = demoAccountInput.checked;
-            emailInput.disabled = isDemo;
-            emailInput.required = !isDemo;
-            emailInput.placeholder = isDemo ? 'username@demo.com' : 'e.g., juan@example.com';
-            document.getElementById('emailRequiredHint').hidden = isDemo;
-        }
-        demoAccountInput?.addEventListener('change', syncDemoAccount);
-        syncDemoAccount();
         document.querySelectorAll('.user-password-toggle').forEach(button => {
             button.addEventListener('click', () => {
                 const input = document.getElementById(button.dataset.passwordTarget);

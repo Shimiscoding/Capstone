@@ -1,4 +1,4 @@
-@extends('layouts.dashboard')
+@extends('layouts.supervisor-dashboard')
 
 @section('title', 'Supervisor Details')
 @section('activePage', 'users-supervisors')
@@ -51,9 +51,9 @@
                             </td>
                             <td>{{ $enforcer->phoneNumber ?: '—' }}<br><small>{{ $enforcer->email }}</small></td>
                             <td class="location-cell"
-                                title="{{ collect([$enforcer->barangay, $enforcer->area, $enforcer->address])->filter()->join(', ') }}">
-                                <strong>{{ $enforcer->barangay ?: '—' }}</strong><small
-                                    class="location-truncate">{{ collect([$enforcer->area, $enforcer->address])->filter()->join(', ') ?:'No address' }}</small>
+                                title="{{ collect([$enforcer->area, $enforcer->address])->filter()->join(', ') }}">
+                                <strong>{{ $enforcer->area ?: '—' }}</strong><small
+                                    class="location-truncate">{{ $enforcer->address ?: 'No address' }}</small>
                             </td>
                             <td><span class="status-badge"><i></i> Registered</span></td>
                             <td class="team-actions-column">
@@ -98,7 +98,7 @@
                         <tr data-enforcer-name="{{ \Illuminate\Support\Str::lower($enforcer->fullName) }}">
                             <td><div class="user-cell"><span class="table-avatar">{{ collect(explode(' ', $enforcer->fullName))->filter()->map(fn($part) => strtoupper(substr($part, 0, 1)))->take(2)->join('') ?: 'E' }}</span><span><strong>{{ $enforcer->fullName }}</strong><small>{{ $enforcer->username ? '@'.$enforcer->username : $enforcer->email }}</small></span></div></td>
                             <td>{{ $enforcer->phoneNumber ?: '—' }}</td>
-                            <td class="location-cell"><strong>{{ $enforcer->barangay ?: '—' }}</strong><small class="location-truncate">{{ collect([$enforcer->area, $enforcer->address])->filter()->join(', ') ?: 'No address' }}</small></td>
+                            <td class="location-cell"><strong>{{ $enforcer->area ?: '—' }}</strong><small class="location-truncate">{{ $enforcer->address ?: 'No address' }}</small></td>
                             <td><form method="POST" action="{{ route('dashboard.users.supervisors.enforcers.assign', [$supervisor, $enforcer]) }}">@csrf<button class="team-add-button" type="submit">Add to team</button></form></td>
                         </tr>
                     @empty
@@ -129,10 +129,6 @@
             <div>
                 <dt>Phone number</dt>
                 <dd>{{ $supervisor->phoneNumber ?: '—' }}</dd>
-            </div>
-            <div>
-                <dt>Barangay</dt>
-                <dd>{{ $supervisor->barangay ?: '—' }}</dd>
             </div>
             <div>
                 <dt>Area</dt>

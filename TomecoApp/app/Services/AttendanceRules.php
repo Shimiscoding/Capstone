@@ -22,7 +22,7 @@ class AttendanceRules
     private function errorFor(User $user, string $action, string $startKey, string $endKey, ?Carbon $moment): ?string
     {
         if (! $user->attendance_restrictions_enabled) {
-            return null;
+            return 'Your attendance schedule has not been set. Please contact an administrator.';
         }
 
         $timezone = $this->settings->get('general.timezone', config('app.timezone'));

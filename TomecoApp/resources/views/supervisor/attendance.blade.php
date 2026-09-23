@@ -1,4 +1,4 @@
-@extends('layouts.dashboard')
+@extends('layouts.admin-dashboard')
 
 @section('title', 'Attendance Management')
 @section('activePage', 'attendance')
@@ -6,7 +6,7 @@
 
 @section('content')
     @php
-        $roleLabel = match ($attendanceType) { 'enforcer' => 'Enforcer', 'admin' => 'Admin', default => 'Supervisor' };
+        $roleLabel = $attendanceType === 'enforcer' ? 'Enforcer' : 'Supervisor';
         $legacyHeading = $roleLabel.' Attendance';
     @endphp
     <div class="page-head users-page-head">
@@ -50,7 +50,7 @@
                         : route('dashboard.users.admins.show', $staff));
                 $attendanceRoute = $staff->isSupervisor()
                     ? route('dashboard.attendance.supervisor', $staff)
-                    : ($staff->isOfficer() ? route('supervisor.enforcers.attendance', $staff) : null);
+                    : ($staff->isOfficer() ? route('dashboard.attendance.enforcers.show', $staff) : null);
                 $nameRoute = $attendanceRoute ?? $detailsRoute;
             @endphp
             <tr>
@@ -73,11 +73,29 @@
     </div><div class="table-footer"><span>Showing {{ $staffMembers->firstItem() ?? 0 }}–{{ $staffMembers->lastItem() ?? 0 }} of {{ $staffMembers->total() }}</span><div class="pagination-actions">@if ($staffMembers->onFirstPage())<span class="page-button is-disabled" aria-disabled="true">Previous</span>@else<a class="page-button" href="{{ $staffMembers->previousPageUrl() }}">Previous</a>@endif @if ($staffMembers->hasMorePages())<a class="page-button" href="{{ $staffMembers->nextPageUrl() }}">Next</a>@else<span class="page-button is-disabled" aria-disabled="true">Next</span>@endif</div></div></section>
 
     <dialog class="attendance-restriction-modal" id="attendanceRestrictionModal" aria-labelledby="attendanceRestrictionTitle">
-        <div class="attendance-modal-head"><div><span>Attendance schedule</span><h2 id="attendanceRestrictionTitle">Set restrictions</h2><p id="attendanceRestrictionUser"></p></div><button type="button" data-close-attendance-modal aria-label="Close modal">&times;</button></div>
+        <div class="attendance-modal-head">
+            <div><h2 id="attendanceRestrictionTitle">Set attendance restrictions</h2><p>Set the days and times this user can record attendance.</p></div>
+            <button type="button" data-close-attendance-modal aria-label="Close modal"><span aria-hidden="true">&times;</span></button>
+        </div>
         <form class="attendance-restriction-form" id="attendanceRestrictionForm" method="POST">@csrf @method('PUT')
-            <label class="attendance-restriction-toggle"><input type="checkbox" name="attendance_restrictions_enabled" value="1"> Enable restrictions for this user</label>
-            <div class="attendance-restriction-times"><label><span>Time In from</span><input type="time" name="attendance_time_in_start" required></label><label><span>Time In until</span><input type="time" name="attendance_time_in_end" required></label><label><span>Time Out from</span><input type="time" name="attendance_time_out_start" required></label><label><span>Time Out until</span><input type="time" name="attendance_time_out_end" required></label></div>
-            <fieldset><legend>Working days</legend><div class="attendance-day-options">@foreach (['monday','tuesday','wednesday','thursday','friday','saturday','sunday'] as $day)<label><input type="checkbox" name="attendance_working_days[]" value="{{ $day }}"><span>{{ ucfirst(substr($day, 0, 3)) }}</span></label>@endforeach</div></fieldset>
+            <label class="attendance-restriction-toggle">
+                <span class="attendance-toggle-copy"><strong>Restrict attendance</strong><small>Only allow records during the schedule below.</small></span>
+                <span class="attendance-toggle-control"><input type="checkbox" name="attendance_restrictions_enabled" value="1" aria-label="Restrict attendance"><i aria-hidden="true"></i></span>
+            </label>
+
+            <div class="attendance-user-row"><span>User</span><strong id="attendanceRestrictionUser"></strong></div>
+
+            <div class="attendance-schedule-fields">
+                <div class="attendance-time-row">
+                    <div class="attendance-time-label"><strong>Time In</strong><span>Allowed clock-in window</span></div>
+                    <div class="attendance-restriction-times"><label><span>From</span><input type="time" name="attendance_time_in_start" required></label><span class="attendance-time-separator">to</span><label><span>Until</span><input type="time" name="attendance_time_in_end" required></label></div>
+                </div>
+                <div class="attendance-time-row">
+                    <div class="attendance-time-label"><strong>Time Out</strong><span>Allowed clock-out window</span></div>
+                    <div class="attendance-restriction-times"><label><span>From</span><input type="time" name="attendance_time_out_start" required></label><span class="attendance-time-separator">to</span><label><span>Until</span><input type="time" name="attendance_time_out_end" required></label></div>
+                </div>
+                <fieldset><legend>Working days</legend><p>Select at least one day.</p><div class="attendance-day-options">@foreach (['monday','tuesday','wednesday','thursday','friday','saturday','sunday'] as $day)<label><input type="checkbox" name="attendance_working_days[]" value="{{ $day }}"><span>{{ ucfirst(substr($day, 0, 3)) }}</span></label>@endforeach</div></fieldset>
+            </div>
             <div class="attendance-modal-actions"><button type="button" class="page-button" data-close-attendance-modal>Cancel</button><button type="submit">Save restrictions</button></div>
         </form>
     </dialog>

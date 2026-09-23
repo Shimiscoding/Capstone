@@ -5,9 +5,10 @@ namespace App\Http\Controllers;
 use App\Models\EnforcerAttendance;
 use App\Models\User;
 use App\Services\AttendanceRules;
+use App\Services\OfficerLocationService;
+use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Contracts\View\View;
 
 class EnforcerAttendanceController extends Controller
 {
@@ -84,9 +85,14 @@ class EnforcerAttendanceController extends Controller
         return back()->with('enforcer_attendance_success', 'Time in recorded for '.$user->fullName.'.');
     }
 
-    public function timeOut(Request $request, User $user, AttendanceRules $rules): RedirectResponse
+    public function timeOut(Request $request, User $user, AttendanceRules $rules, OfficerLocationService $locations): RedirectResponse
     {
         $this->ensureAssignedEnforcer($request, $user);
+
+        if ($error = $rules->timeOutError($user)) {
+            return back()->with('enforcer_attendance_error', $error);
+        }
+
         $attendance = EnforcerAttendance::where('user_id', $user->id)->whereDate('attendance_date', today())->first();
 
         if (! $attendance?->time_in) {
@@ -95,11 +101,8 @@ class EnforcerAttendanceController extends Controller
         if ($attendance->time_out) {
             return back()->with('enforcer_attendance_error', $user->fullName.' has already timed out today.');
         }
-        if ($error = $rules->timeOutError($user)) {
-            return back()->with('enforcer_attendance_error', $error);
-        }
-
         $attendance->update(['supervisor_id' => $request->user()->id, 'time_out' => now()]);
+        $locations->stopSharing($user);
 
         return back()->with('enforcer_attendance_success', 'Time out recorded for '.$user->fullName.'.');
     }

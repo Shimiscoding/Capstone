@@ -54,7 +54,7 @@ class ExampleTest extends TestCase
             'email' => 'new@example.com',
             'password' => 'password',
             'password_confirmation' => 'password',
-        ])->assertRedirect(route('verification.notice'));
+        ])->assertRedirect(route('dashboard'));
 
         $this->assertAuthenticated();
         $this->assertDatabaseHas('users', [
@@ -76,7 +76,7 @@ class ExampleTest extends TestCase
             'role' => User::ROLE_OFFICER,
             'password' => 'password',
             'password_confirmation' => 'password',
-        ])->assertRedirect(route('verification.notice'));
+        ])->assertRedirect(route('dashboard'));
 
         $this->assertDatabaseHas('users', [
             'email' => 'role@example.com',
@@ -102,7 +102,9 @@ class ExampleTest extends TestCase
     {
         $user = User::factory()->create();
         Violation::create([
-            'motorist_name' => 'Juan Dela Cruz',
+            'first_name' => 'Juan',
+            'middle_name' => 'Dela',
+            'last_name' => 'Cruz',
             'plate_number' => 'ABC 123',
             'violation_type' => 'Illegal parking',
             'fine_amount' => 500,
@@ -119,6 +121,7 @@ class ExampleTest extends TestCase
         $user = User::factory()->create([
             'email' => 'test@example.com',
             'password' => 'password',
+            'role' => User::ROLE_ADMIN,
         ]);
 
         $this->post('/login', [
@@ -137,6 +140,7 @@ class ExampleTest extends TestCase
     {
         $user = User::factory()->create([
             'password' => 'password',
+            'role' => User::ROLE_ADMIN,
         ]);
 
         $this->post('/login', [
@@ -162,6 +166,7 @@ class ExampleTest extends TestCase
         $user = User::factory()->create([
             'username' => 'tomeco.admin',
             'password' => 'password',
+            'role' => User::ROLE_ADMIN,
         ]);
 
         $this->post('/login', [

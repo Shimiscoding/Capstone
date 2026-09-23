@@ -1,4 +1,4 @@
-@extends('layouts.dashboard')
+@extends('layouts.admin-dashboard')
 
 @section('title', 'Analytics')
 @section('activePage', 'analytics')
@@ -6,9 +6,9 @@
 @section('content')
     <div class="page-head home-page-head">
         <div>
-            <p class="eyebrow">System activity</p>
+            <p class="eyebrow">Performance intelligence</p>
             <h1>Analytics</h1>
-            <p class="page-description">Compare overall system activity or focus on one category.</p>
+            <p class="page-description">Track violation patterns, account growth, and the vehicle types most often cited.</p>
         </div>
         <div class="analytics-controls">
             <form method="GET" action="{{ route('dashboard.analytics') }}"><label
@@ -30,16 +30,34 @@
         </div>
     </div>
 
-    <section class="dashboard-panel overall-line-panel">
+    <div class="analytics-kpi-grid">
+        <article class="analytics-kpi"><span>Violations</span><strong>{{ number_format($periodViolationTotal) }}</strong><small>During the {{ $periodDescription }}</small></article>
+        <article class="analytics-kpi"><span>New users</span><strong>{{ number_format($periodUserTotal) }}</strong><small>During the {{ $periodDescription }}</small></article>
+    </div>
+
+    <div class="analytics-graph-grid">
+    <section class="dashboard-panel overall-line-panel analytics-chart-card">
         <div class="panel-heading">
             <div>
                 <h2 id="analyticsChartTitle">Overall Activity</h2>
                 <p>Activity recorded during the {{ $periodDescription }}</p>
             </div>
         </div>
-        <div class="chartjs-container"><canvas id="analyticsChart" aria-label="Overall activity line chart"
+        <div class="chartjs-container"><canvas id="analyticsChart" aria-label="Overall activity chart"
                 role="img"></canvas></div>
     </section>
+
+    <section class="dashboard-panel overall-line-panel analytics-chart-card">
+        <div class="panel-heading">
+            <div>
+                <h2>Most Common Vehicle Types</h2>
+                <p>Vehicle types with the most violations during the {{ $periodDescription }}</p>
+            </div>
+        </div>
+        <div class="chartjs-container"><canvas id="vehicleTrendChart" aria-label="Vehicle types with the most violations" role="img"></canvas></div>
+        @if ($vehicleTrends->isEmpty())<p class="analytics-empty-note">No vehicle data recorded for this period.</p>@endif
+    </section>
+    </div>
 @endsection
 
 @push('scripts')
@@ -51,14 +69,16 @@
                 violators: {
                     label: 'Violators',
                     data: @json($dailyViolations->pluck('value')),
-                    borderColor: '#dc2626',
-                    backgroundColor: '#dc2626'
+                    borderColor: '#991b1b',
+                    backgroundColor: 'rgba(153, 27, 27, .10)',
+                    chartColor: '#991b1b'
                 },
                 users: {
                     label: 'Users',
                     data: @json($dailyUsers->pluck('value')),
-                    borderColor: '#9333ea',
-                    backgroundColor: '#9333ea'
+                    borderColor: '#2563eb',
+                    backgroundColor: 'rgba(37, 99, 235, .10)',
+                    chartColor: '#2563eb'
                 }
             };
             const chartTitles = {
@@ -72,11 +92,11 @@
             let chart;
             const dataset = item => ({
                 ...item,
-                tension: .35,
-                borderWidth: 3,
-                pointRadius: 4,
-                pointHoverRadius: 6,
-                fill: false
+                tension: .3,
+                borderWidth: 2,
+                pointRadius: 3,
+                pointHoverRadius: 5,
+                fill: true
             });
             const renderChart = () => {
                 const selected = filter.value;
@@ -92,7 +112,7 @@
                         label: 'Total activity',
                         data: selectedItems.map(item => item.data.reduce((total, value) => total + value,
                             0)),
-                        backgroundColor: selectedItems.map(item => item.backgroundColor),
+                        backgroundColor: selectedItems.map(item => item.chartColor),
                         borderColor: '#ffffff',
                         borderWidth: 3
                     }];
@@ -100,8 +120,8 @@
                     datasets = [{
                         label: selectedItems[0].label,
                         data: selectedItems[0].data,
-                        backgroundColor: ['#dbeafe', '#bfdbfe', '#93c5fd', '#60a5fa', '#3b82f6', '#2563eb',
-                            '#1d4ed8'
+                        backgroundColor: ['#991b1b', '#2563eb', '#d97706', '#15803d', '#7c3aed', '#0891b2',
+                            '#db2777'
                         ],
                         borderColor: '#ffffff',
                         borderWidth: 3
@@ -157,6 +177,34 @@
             filter.addEventListener('change', renderChart);
             typeFilter.addEventListener('change', renderChart);
             renderChart();
+
+            const vehicleCanvas = document.getElementById('vehicleTrendChart');
+            if (vehicleCanvas) {
+                new Chart(vehicleCanvas, {
+                    type: 'bar',
+                    data: {
+                        labels: @json($vehicleTrends->pluck('vehicle_type')),
+                        datasets: [{
+                            label: 'Violations',
+                            data: @json($vehicleTrends->pluck('total')),
+                            backgroundColor: ['#991b1b', '#2563eb', '#d97706', '#15803d', '#7c3aed', '#0891b2', '#db2777', '#4f46e5', '#65a30d', '#ea580c'],
+                            borderRadius: 6,
+                            borderSkipped: false,
+                            barThickness: 20
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        indexAxis: 'y',
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            x: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#eef0f2' }, border: { display: false } },
+                            y: { grid: { display: false }, border: { display: false } }
+                        }
+                    }
+                });
+            }
         })();
     </script>
 @endpush
