@@ -44,6 +44,7 @@ Route::middleware('auth')->group(function (): void {
         Route::controller(DashboardController::class)->prefix('dashboard')->name('dashboard.')->group(function (): void {
             Route::get('/analytics', 'analytics')->name('analytics');
             Route::get('/violation-records', 'violationRecords')->name('violation-records');
+            Route::get('/violation-records/motorists/{violation}', 'motoristRecord')->name('violation-records.motorist');
             Route::get('/violation-records/{violation}', 'violationRecord')->name('violation-records.show');
         });
 

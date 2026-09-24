@@ -61,20 +61,30 @@ class DashboardController extends Controller
 
     public function violationRecord(Violation $violation): View
     {
-        $normalize = static fn (?string $value): string => strtolower(preg_replace('/[^a-z0-9]/i', '', (string) $value));
-        $licenseNumber = $normalize($violation->license_number);
-        $motoristName = $normalize($violation->full_name);
+        $violation->load('enforcer');
 
-        $motoristViolations = Violation::query()->with('enforcer')->latest()->get()
-            ->filter(function (Violation $record) use ($licenseNumber, $motoristName, $normalize): bool {
-                if ($licenseNumber !== '') {
-                    return $normalize($record->license_number) === $licenseNumber;
-                }
+        return view('dashboard.violation-ticket-show', compact('violation'));
+    }
 
-                return $motoristName !== '' && $normalize($record->full_name) === $motoristName;
-            })->values();
+    public function motoristRecord(Violation $violation): View
+    {
+        $motoristKey = $violation->motorist_key ?: Violation::makeMotoristKey(
+            $violation->license_number,
+            $violation->full_name,
+        );
+        $motoristViolations = Violation::query()
+            ->with('enforcer')
+            ->where('motorist_key', $motoristKey)
+            ->latest()
+            ->paginate(10);
 
-        return view('dashboard.violation-record-show', compact('violation', 'motoristViolations'));
+        abort_if($motoristViolations->isEmpty(), 404);
+
+        return view('dashboard.motorist-violation-history', [
+            'motorist' => $violation,
+            'motoristViolations' => $motoristViolations,
+            'totalAssessedFines' => Violation::query()->where('motorist_key', $motoristKey)->sum('fine_amount'),
+        ]);
     }
 
     public function analytics(Request $request, Settings $settings): View
@@ -86,14 +96,17 @@ class DashboardController extends Controller
         $buckets = match ($period) {
             'monthly' => collect(range(11, 0))->map(function (int $monthsAgo): array {
                 $date = now()->subMonths($monthsAgo);
+
                 return ['label' => $date->format('M'), 'date' => $date->format('F Y'), 'start' => $date->copy()->startOfMonth(), 'end' => $date->copy()->endOfMonth()];
             }),
             'yearly' => collect(range(4, 0))->map(function (int $yearsAgo): array {
                 $date = now()->subYears($yearsAgo);
+
                 return ['label' => $date->format('Y'), 'date' => $date->format('Y'), 'start' => $date->copy()->startOfYear(), 'end' => $date->copy()->endOfYear()];
             }),
             default => collect(range(6, 0))->map(function (int $daysAgo): array {
                 $date = now()->subDays($daysAgo);
+
                 return ['label' => $date->format('D'), 'date' => $date->format('M d'), 'start' => $date->copy()->startOfDay(), 'end' => $date->copy()->endOfDay()];
             }),
         };
@@ -120,7 +133,9 @@ class DashboardController extends Controller
             'vehicleTrends' => $vehicleTrends,
             'periodViolationTotal' => $dailyViolations->sum('value'),
             'periodUserTotal' => $dailyUsers->sum('value'),
-            'periodDescription' => match ($period) { 'monthly' => 'last 12 months', 'yearly' => 'last 5 years', default => 'last 7 days' },
+            'periodDescription' => match ($period) {
+                'monthly' => 'last 12 months', 'yearly' => 'last 5 years', default => 'last 7 days'
+            },
         ]);
     }
 
@@ -160,6 +175,7 @@ class DashboardController extends Controller
                 'users' => User::query()->whereBetween('created_at', [$start, $end])->count(),
             ];
         });
+
         return view('dashboard.index', [
             'totalUsers' => User::count(),
             'totalTickets' => (clone $violationQuery)->count(),
@@ -240,6 +256,7 @@ class DashboardController extends Controller
         $sort = in_array($request->query('sort'), ['latest', 'oldest', 'name_asc', 'name_desc'], true)
             ? $request->query('sort')
             : 'latest';
+
         return view('supervisor.attendance', [
             'staffMembers' => User::query()
                 ->where('role', $role)

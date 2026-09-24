@@ -7,6 +7,7 @@ use App\Models\Violation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class ViolationController extends Controller
 {
@@ -33,11 +34,19 @@ class ViolationController extends Controller
             'violation_type' => ['required', 'string', 'max:255'],
             'fine_amount' => ['required', 'numeric', 'min:0'],
             'location' => ['nullable', 'string'],
+            'evidence_image' => ['required', 'string', 'max:10000000'],
             'signature' => ['required', 'string', 'max:7000000'],
         ]);
 
+        if (blank($request->user()->signature)) {
+            throw ValidationException::withMessages([
+                'enforcer_signature' => 'Save your enforcer signature in Settings before issuing a ticket.',
+            ]);
+        }
+
         $validated['enforcer_id'] = $request->user()->id;
         $validated['enforcer_name'] = $request->user()->fullName;
+        $validated['enforcer_signature'] = $request->user()->signature;
         $validated['vehicle_type'] = Str::title(trim($validated['vehicle_type']));
         $violation = Violation::create($validated);
 
@@ -74,6 +83,7 @@ class ViolationController extends Controller
             'fine_amount' => ['sometimes', 'required', 'numeric'],
             'status' => ['sometimes', 'string'],
             'location' => ['nullable', 'string'],
+            'evidence_image' => ['sometimes', 'required', 'string', 'max:10000000'],
             'signature' => ['sometimes', 'required', 'string', 'max:7000000'],
         ]);
 

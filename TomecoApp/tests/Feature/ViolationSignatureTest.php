@@ -27,17 +27,22 @@ class ViolationSignatureTest extends TestCase
             'vehicle_type' => 'motorcycle',
             'violation_type' => 'Illegal parking',
             'fine_amount' => 500,
+            'evidence_image' => 'data:image/jpeg;base64,ZXZpZGVuY2U=',
             'signature' => 'data:image/png;base64,motorist-signature',
         ]);
 
         $response->assertCreated()
             ->assertJsonPath('data.enforcer_id', $enforcer->id)
             ->assertJsonPath('data.enforcer_name', $enforcer->fullName)
+            ->assertJsonPath('data.enforcer_signature', 'data:image/png;base64,enforcer-signature')
+            ->assertJsonPath('data.evidence_image', 'data:image/jpeg;base64,ZXZpZGVuY2U=')
             ->assertJsonPath('data.signature', 'data:image/png;base64,motorist-signature');
 
         $violation = Violation::firstOrFail();
         $this->assertTrue($violation->enforcer->is($enforcer));
         $this->assertSame('data:image/png;base64,motorist-signature', $violation->signature);
+        $this->assertSame('data:image/png;base64,enforcer-signature', $violation->enforcer_signature);
+        $this->assertSame('data:image/jpeg;base64,ZXZpZGVuY2U=', $violation->evidence_image);
         $this->assertNotSame($violation->signature, $violation->getRawOriginal('signature'));
     }
 
@@ -52,6 +57,7 @@ class ViolationSignatureTest extends TestCase
             'vehicle_type' => 'Motorcycle',
             'violation_type' => 'Illegal parking',
             'fine_amount' => 500,
+            'evidence_image' => 'data:image/jpeg;base64,ZXZpZGVuY2U=',
         ])->assertUnprocessable()->assertJsonValidationErrors('signature');
     }
 
@@ -92,13 +98,17 @@ class ViolationSignatureTest extends TestCase
             'vehicle_type' => 'Motorcycle',
             'violation_type' => 'Illegal parking',
             'fine_amount' => 500,
+            'evidence_image' => 'data:image/jpeg;base64,ZXZpZGVuY2U=',
             'signature' => $signature,
+            'enforcer_signature' => $enforcerSignature,
         ]);
 
         $this->actingAs($admin)
             ->get(route('dashboard.violation-records.show', $violation))
             ->assertOk()
-            ->assertSee('Motorist signature')
+            ->assertSee('Driver signature')
+            ->assertSee('Evidence image')
+            ->assertSee('Enforcer signature')
             ->assertSee($signature, false)
             ->assertSee('Captured for ticket #0000001')
             ->assertSee($enforcer->fullName)

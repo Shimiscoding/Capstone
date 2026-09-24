@@ -18,7 +18,7 @@
         <div>
             <p class="eyebrow">Traffic violation records</p>
             <h1>Violation Records</h1>
-            <p class="page-description">Review issued violations, motorist details, locations, and assessed fines.</p>
+            <p class="page-description">Review issued violations, driver details, locations, and assessed fines.</p>
         </div>
         <div class="user-count">{{ number_format($violations->total()) }}
             {{ \Illuminate\Support\Str::plural('record', $violations->total()) }}</div>
@@ -56,19 +56,10 @@
 
     <div class="table-card">
         <div class="table-scroll">
-            <table class="users-table violation-records-table">
+            <table class="users-table violation-records-table compact-records-table">
                 <thead>
                     <tr>
-                        <th><span class="users-column-heading"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="7" r="3"/><path d="M4 17c.6-4 2.6-6 6-6s5.4 2 6 6"/></svg>Full name</span></th>
-                        <th><span class="users-column-heading"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="4" width="14" height="12" rx="2"/><path d="M6 8h3M6 11h7"/></svg>D/L Permit</span></th>
-                        <th><span class="users-column-heading"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="5" width="14" height="10" rx="2"/><path d="M6 9h8M7 12h1M12 12h1"/></svg>Plate number</span></th>
-                        <th>Vehicle type</th>
-                        <th><abbr title="Official Receipt">OR</abbr> number</th>
-                        <th><abbr title="Certificate of Registration">CR</abbr> number</th>
-                        <th><span class="users-column-heading"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.5 17 6v5c0 3.4-2.4 5.5-7 7-4.6-1.5-7-3.6-7-7V6zM10 6v5M10 14h.01"/></svg>Violation</span></th>
-                        <th><span class="users-column-heading"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 18s6-5.4 6-10a6 6 0 1 0-12 0c0 4.6 6 10 6 10z"/><circle cx="10" cy="8" r="2"/></svg>Location</span></th>
-                        <th><span class="users-column-heading"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="4" width="14" height="13" rx="2"/><path d="M6 2v4M14 2v4M3 8h14"/></svg>Date issued</span></th>
-                        <th><span class="users-column-heading"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7"/><path d="M12.5 7.5H9a2 2 0 0 0 0 4h2a2 2 0 0 1 0 4H7.5M10 5v2.5M10 15.5V18"/></svg>Fine</span></th>
+                        <th>Ticket</th><th>Driver</th><th>Vehicle</th><th>Violation</th><th>Enforcer</th><th>Issued</th><th>Fine / status</th><th class="actions-column">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -77,25 +68,19 @@
                             $motoristName = $violation->full_name;
                             $permitType = match ($violation->license_type) { 'professional' => 'Professional', 'non_professional' => 'Non-professional', 'student_permit' => 'Student permit', 'other' => 'Other', default => '—' };
                         @endphp
-                        <tr class="violation-record-row" tabindex="0" role="link" aria-label="View ticket details for {{ $motoristName ?: 'unknown motorist' }}" data-record-url="{{ route('dashboard.violation-records.show', $violation) }}">
-                            <td>
-                                <div class="user-cell"><span
-                                        class="table-avatar">{{ strtoupper(substr($motoristName ?: 'M', 0, 1)) }}</span><span><strong><a class="violation-name-button" href="{{ route('dashboard.violation-records.show', $violation) }}">{{ $motoristName ?: 'Unknown motorist' }}</a></strong></span>
-                                </div>
-                            </td>
-                            <td><span class="violation-permit-cell"><span class="badge-number">{{ $violation->license_number ?: '—' }}</span><small>{{ $permitType }}</small></span></td>
-                            <td><span class="badge-number">{{ $violation->plate_number }}</span></td>
-                            <td>{{ $violation->vehicle_type ?: 'Not specified' }}</td>
-                            <td><span class="badge-number">{{ $violation->or_number ?: '—' }}</span></td>
-                            <td><span class="badge-number">{{ $violation->cr_number ?: '—' }}</span></td>
-                            <td>{{ $violation->violation_type }}</td>
-                            <td>{{ $violation->location ?: '—' }}</td>
+                        <tr>
+                            <td><a class="ticket-link" href="{{ route('dashboard.violation-records.show', $violation) }}">#{{ str_pad((string) $violation->id, 7, '0', STR_PAD_LEFT) }}</a><small>{{ $violation->created_at?->format('h:i A') }}</small></td>
+                            <td><a class="motorist-name-link" href="{{ route('dashboard.violation-records.motorist', $violation) }}">{{ $motoristName ?: 'Unknown driver' }}</a><small>{{ $violation->license_number ?: 'No permit recorded' }}</small></td>
+                            <td><strong class="badge-number">{{ $violation->plate_number ?: '—' }}</strong><small>{{ $violation->vehicle_type ?: 'Not specified' }}</small></td>
+                            <td><span class="cell-wrap">{{ $violation->violation_type ?: '—' }}</span><small>{{ $violation->location ?: 'Location not recorded' }}</small></td>
+                            <td><strong>{{ $violation->enforcer_name ?: 'Not recorded' }}</strong><small>{{ filled($violation->enforcer_signature) ? 'Signature recorded' : 'Signature missing' }}</small></td>
                             <td>{{ $violation->created_at?->format('M d, Y') ?? '—' }}</td>
-                            <td><strong>&#8369;{{ number_format($violation->fine_amount, 2) }}</strong></td>
+                            <td><strong>&#8369;{{ number_format($violation->fine_amount, 2) }}</strong><span class="status-badge {{ $violation->status === 'paid' ? '' : 'status-pending' }}"><i></i>{{ ucfirst($violation->status ?: 'unpaid') }}</span></td>
+                            <td class="actions-column"><details class="record-actions"><summary aria-label="Actions for ticket {{ $violation->id }}" title="Ticket actions"><span aria-hidden="true">&#8942;</span></summary><div><a href="{{ route('dashboard.violation-records.show', $violation) }}">View complete ticket</a></div></details></td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="10" class="empty-state"><strong>No violation records found</strong><span>Try a different motorist, plate number, or violation.</span></td>
+                            <td colspan="8" class="empty-state"><strong>No violation records found</strong><span>Try a different plate number or violation.</span></td>
                         </tr>
                     @endforelse
                 </tbody>
@@ -119,20 +104,4 @@
 
 @endsection
 
-@push('scripts')
-<script>
-(() => {
-    document.querySelectorAll('.violation-record-row').forEach(row => {
-        row.addEventListener('click', event => {
-            if (!event.target.closest('a')) window.location.assign(row.dataset.recordUrl);
-        });
-        row.addEventListener('keydown', event => {
-            if (event.key === 'Enter' || event.key === ' ') {
-                event.preventDefault();
-                window.location.assign(row.dataset.recordUrl);
-            }
-        });
-    });
-})();
-</script>
-@endpush
+@push('scripts')<script>document.addEventListener('click',event=>document.querySelectorAll('.record-actions[open]').forEach(menu=>{if(!menu.contains(event.target))menu.removeAttribute('open')}));</script>@endpush

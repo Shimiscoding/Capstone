@@ -6,7 +6,7 @@
 
 @section('content')
     @php
-        $motoristName = $violation->full_name ?: 'Unknown motorist';
+        $motoristName = $violation->full_name ?: 'Unknown driver';
         $permitType = match ($violation->license_type) {
             'professional' => 'Professional',
             'non_professional' => 'Non-professional',
@@ -32,7 +32,7 @@
     <div class="page-head users-page-head violation-detail-page-head">
         <div class="users-heading-copy">
             <p class="eyebrow">Violation records</p>
-            <h1>Motorist details</h1>
+            <h1>Driver details</h1>
             <p class="page-description">Review the driver profile and complete citation history.</p>
         </div>
         <a class="page-button detail-back-button violation-back-button" href="{{ route('dashboard.violation-records') }}">
@@ -45,7 +45,7 @@
             <span class="table-avatar">{{ collect(explode(' ', $motoristName))->filter()->map(fn($part) => strtoupper(substr($part, 0, 1)))->take(2)->join('') ?: 'M' }}</span>
             <div>
                 <h2>{{ $motoristName }}</h2>
-                <p><span class="role-badge">Motorist</span><span class="status-badge"><i></i>{{ $motoristViolations->count() }} {{ \Illuminate\Support\Str::plural('citation', $motoristViolations->count()) }}</span></p>
+                <p><span class="role-badge">Driver</span><span class="status-badge"><i></i>{{ $motoristViolations->count() }} {{ \Illuminate\Support\Str::plural('citation', $motoristViolations->count()) }}</span></p>
             </div>
         </div>
         <dl class="user-detail-list staff-detail-list">
@@ -57,7 +57,7 @@
             <div><dt>Vehicle type</dt><dd>{{ $violation->vehicle_type ?: 'Not specified' }}</dd></div>
             <div><dt>Total assessed fines</dt><dd>&#8369;{{ number_format($motoristViolations->sum('fine_amount'), 2) }}</dd></div>
             <div class="motorist-signature-detail">
-                <dt>Motorist signature</dt>
+                <dt>Driver signature</dt>
                 <dd>
                     @if ($signatureSource)
                         <img src="{{ $signatureSource }}" alt="{{ $motoristName }} signature">

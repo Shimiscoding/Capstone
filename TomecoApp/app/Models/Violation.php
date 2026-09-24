@@ -28,6 +28,8 @@ class Violation extends Model
         'location',
         'evidence_image',
         'signature',
+        'enforcer_signature',
+        'motorist_key',
     ];
 
     protected function casts(): array
@@ -41,8 +43,29 @@ class Violation extends Model
             'or_number' => 'encrypted',
             'cr_number' => 'encrypted',
             'location' => 'encrypted',
+            'evidence_image' => 'encrypted',
             'signature' => 'encrypted',
+            'enforcer_signature' => 'encrypted',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::saving(function (Violation $violation): void {
+            $violation->motorist_key = self::makeMotoristKey(
+                $violation->license_number,
+                $violation->full_name,
+            );
+        });
+    }
+
+    public static function makeMotoristKey(?string $licenseNumber, ?string $fullName): string
+    {
+        $license = strtolower((string) preg_replace('/[^a-z0-9]/i', '', (string) $licenseNumber));
+        $name = strtolower((string) preg_replace('/[^a-z0-9]/i', '', (string) $fullName));
+        $identity = $license !== '' ? 'license:'.$license : 'name:'.$name;
+
+        return hash_hmac('sha256', $identity, (string) config('app.key'));
     }
 
     public function getFullNameAttribute(): string
@@ -56,5 +79,4 @@ class Violation extends Model
     {
         return $this->belongsTo(User::class, 'enforcer_id');
     }
-
 }
