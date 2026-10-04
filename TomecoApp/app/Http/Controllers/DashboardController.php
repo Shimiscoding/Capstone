@@ -327,18 +327,10 @@ class DashboardController extends Controller
         $this->ensureAdmin($request);
         abort_unless($user->role === User::ROLE_SUPERVISOR, 404);
 
-        $user->load(['enforcers' => fn ($query) => $query
-            ->where('role', User::ROLE_OFFICER)
-            ->orderBy('firstName')
-            ->orderBy('lastName')]);
-
-        return view('supervisor.show', [
-            'supervisor' => $user,
-            'availableEnforcers' => User::where('role', User::ROLE_OFFICER)
-                ->whereNull('supervisor_id')
-                ->orderBy('firstName')
-                ->orderBy('lastName')
-                ->get(),
+        return view('dashboard.users.staff-show', [
+            'staffUser' => $user,
+            'section' => 'supervisors',
+            'sectionLabel' => 'Supervisor',
         ]);
     }
 

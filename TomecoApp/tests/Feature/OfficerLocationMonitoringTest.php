@@ -56,11 +56,24 @@ class OfficerLocationMonitoringTest extends TestCase
         $this->locationFor($officerA, $supervisorA);
         $this->locationFor($officerB, $supervisorB);
 
-        $this->actingAs($supervisorA)->getJson(route('location-monitoring.officers'))->assertOk()->assertJsonCount(1, 'officers')->assertJsonPath('officers.0.id', $officerA->id);
-        $this->actingAs($supervisorB)->getJson(route('location-monitoring.officers'))->assertOk()->assertJsonCount(1, 'officers')->assertJsonPath('officers.0.id', $officerB->id);
+        $this->actingAs($supervisorA)->getJson(route('location-monitoring.officers'))
+            ->assertOk()
+            ->assertJsonCount(1, 'officers')
+            ->assertJsonPath('officers.0.id', $officerA->id)
+            ->assertJsonCount(1, 'teams')
+            ->assertJsonPath('teams.0.id', $supervisorA->id);
+        $this->actingAs($supervisorB)->getJson(route('location-monitoring.officers'))
+            ->assertOk()
+            ->assertJsonCount(1, 'officers')
+            ->assertJsonPath('officers.0.id', $officerB->id)
+            ->assertJsonCount(1, 'teams')
+            ->assertJsonPath('teams.0.id', $supervisorB->id);
 
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
-        $this->actingAs($admin)->getJson(route('location-monitoring.officers'))->assertOk()->assertJsonCount(2, 'officers');
+        $this->actingAs($admin)->getJson(route('location-monitoring.officers'))
+            ->assertOk()
+            ->assertJsonCount(2, 'officers')
+            ->assertJsonCount(2, 'teams');
     }
 
     public function test_time_out_stops_location_sharing(): void

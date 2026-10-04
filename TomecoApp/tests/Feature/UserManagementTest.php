@@ -353,28 +353,25 @@ class UserManagementTest extends TestCase
         $this->assertDatabaseMissing('users', ['username' => 'test.admin']);
     }
 
-    public function test_supervisor_details_show_only_their_assigned_enforcers(): void
+    public function test_supervisor_details_use_the_admin_profile_view(): void
     {
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
-        $supervisor = User::factory()->create(['role' => User::ROLE_SUPERVISOR]);
-        $assigned = User::factory()->create([
-            'role' => User::ROLE_OFFICER,
-            'supervisor_id' => $supervisor->id,
-            'fullName' => 'Assigned Enforcer',
-        ]);
-        $otherSupervisor = User::factory()->create(['role' => User::ROLE_SUPERVISOR]);
-        User::factory()->create([
-            'role' => User::ROLE_OFFICER,
-            'supervisor_id' => $otherSupervisor->id,
-            'fullName' => 'Other Enforcer',
+        $supervisor = User::factory()->create([
+            'role' => User::ROLE_SUPERVISOR,
+            'fullName' => 'Detail Supervisor',
+            'area' => 'Downtown',
         ]);
 
         $this->actingAs($admin)
             ->get(route('dashboard.users.supervisors.show', $supervisor))
             ->assertOk()
-            ->assertSee($supervisor->fullName)
-            ->assertSee($assigned->fullName)
-            ->assertDontSee('Other Enforcer');
+            ->assertSee('Supervisor management')
+            ->assertSee('Detail Supervisor')
+            ->assertSee('Supervisor profile, contact, and location details.')
+            ->assertSee('Downtown')
+            ->assertSee(route('dashboard.users.supervisors'), false)
+            ->assertSee(route('dashboard.users.edit', ['user' => $supervisor, 'from' => 'supervisors']), false)
+            ->assertDontSee('View the enforcers assigned to this supervisor.');
     }
 
     public function test_admin_can_add_and_remove_enforcers_from_a_supervisor_details_page(): void
@@ -386,14 +383,6 @@ class UserManagementTest extends TestCase
             'supervisor_id' => null,
             'fullName' => 'Available Enforcer',
         ]);
-
-        $this->actingAs($admin)
-            ->get(route('dashboard.users.supervisors.show', $supervisor))
-            ->assertOk()
-            ->assertSee('Add enforcer')
-            ->assertSee('Search by name')
-            ->assertSee('Available Enforcer')
-            ->assertDontSee('href="'.route('dashboard.users.edit', ['user' => $available, 'from' => 'enforcers']).'"', false);
 
         $this->actingAs($admin)
             ->post(route('dashboard.users.supervisors.enforcers.assign', [$supervisor, $available]))

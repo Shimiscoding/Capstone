@@ -4,6 +4,13 @@
 @section('activePage', 'users-' . $section)
 
 @section('content')
+    @php
+        $sectionRoute = match ($section) {
+            'supervisors' => route('dashboard.users.supervisors'),
+            'admins' => route('dashboard.users.admins'),
+            default => route('dashboard.users.enforcers'),
+        };
+    @endphp
     <div class="page-head users-page-head">
         <div>
             <p class="eyebrow">{{ $sectionLabel }} management</p>
@@ -11,7 +18,7 @@
             <p class="page-description">{{ $sectionLabel }} profile, contact, and location details.</p>
         </div>
         <div class="users-page-actions"><a class="page-button detail-back-button"
-                href="{{ $section === 'admins' ? route('dashboard.users.admins') : route('dashboard.users.enforcers') }}"
+                href="{{ $sectionRoute }}"
                 aria-label="Back to {{ $section }}" title="Back to {{ $section }}">&larr;</a><a
                 class="add-user-button" href="{{ route('dashboard.users.edit', ['user' => $staffUser, 'from' => $section]) }}">Edit
                 {{ strtolower($sectionLabel) }}</a></div>
