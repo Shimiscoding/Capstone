@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class EnforcerAttendance extends Model
 {
     protected $fillable = [
-        'user_id', 'supervisor_id', 'attendance_date', 'time_in', 'time_out',
+        'user_id', 'supervisor_id', 'session', 'attendance_date', 'time_in', 'time_out',
         'time_in_latitude', 'time_in_longitude', 'time_out_latitude', 'time_out_longitude',
     ];
 

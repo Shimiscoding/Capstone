@@ -27,6 +27,19 @@ class AdminAttendanceController extends Controller
             'attendance_working_days' => ['required', 'array', 'min:1'],
             'attendance_working_days.*' => ['required', Rule::in(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'])],
         ]);
+        if ($user->isOfficer()) {
+            $sessionRules = [
+                'attendance_time_in_start' => ['required', 'date_format:H:i', 'before:12:00'],
+                'attendance_time_in_end' => ['required', 'date_format:H:i', 'after:attendance_time_in_start', 'before:12:00'],
+                'attendance_time_out_start' => ['required', 'date_format:H:i', 'after:attendance_time_in_end'],
+                'attendance_time_out_end' => ['required', 'date_format:H:i', 'after:attendance_time_out_start'],
+                'attendance_afternoon_time_in_start' => ['required', 'date_format:H:i', 'after_or_equal:12:00', 'after:attendance_time_out_end'],
+                'attendance_afternoon_time_in_end' => ['required', 'date_format:H:i', 'after:attendance_afternoon_time_in_start'],
+                'attendance_afternoon_time_out_start' => ['required', 'date_format:H:i', 'after:attendance_afternoon_time_in_end'],
+                'attendance_afternoon_time_out_end' => ['required', 'date_format:H:i', 'after:attendance_afternoon_time_out_start'],
+            ];
+            $attributes = array_merge($attributes, $request->validate($sessionRules));
+        }
         $user->update($attributes);
 
         return back()->with('attendance_success', 'Attendance restrictions updated for '.$user->fullName.'.');

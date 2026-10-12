@@ -7,6 +7,7 @@
     <title>@yield('title', 'Dashboard') | TOMECO</title>
     <link rel="stylesheet" href="{{ asset('css/dashboard.css') }}?v={{ filemtime(public_path('css/dashboard.css')) }}">
     <link rel="icon" href="{{ asset('images/favicon.ico') }}">
+    @stack('styles')
 </head>
 
 <body>
@@ -52,7 +53,7 @@
             @include('dashboard.partials.notifications')
             <div class="profile-menu" id="profileMenu">
                 <button class="profile" id="profileMenuToggle" type="button" aria-label="Open account menu"
-                    aria-haspopup="menu" aria-expanded="false">{{ $initials ?: 'U' }}</button>
+                    aria-haspopup="menu" aria-expanded="false"><x-user-avatar :user="$user" class="header-profile-avatar" /></button>
                 <div class="profile-dropdown" id="profileDropdown" role="menu" hidden>
                     <div class="profile-dropdown-user">
                         <strong>{{ $user->fullName ?: 'User' }}</strong><small>{{ $user->email }}</small></div>
@@ -98,16 +99,7 @@
                             <a class="nav-subitem {{ $activePage === 'users-admins' ? 'is-active' : '' }}" href="{{ route('dashboard.users.admins') }}">Admins</a>
                         </div>
                     </details>
-                    <details class="nav-dropdown" @if ($activePage === 'area-assignments') open @endif>
-                        <summary class="nav-item {{ $activePage === 'area-assignments' ? 'is-active' : '' }}">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 20h16M6 17V7l6-4 6 4v10" /><path d="M9 10h6M9 14h6" /></svg>
-                            <span class="nav-text">Area Assignments</span><span class="nav-dropdown-arrow">&rsaquo;</span>
-                        </summary>
-                        <div class="nav-submenu">
-                            <a class="nav-subitem {{ request('type') === 'supervisor' ? 'is-active' : '' }}" href="{{ route('area-assignments.index', ['type' => 'supervisor']) }}">Supervisors</a>
-                            <a class="nav-subitem {{ request('type', 'officer') === 'officer' ? 'is-active' : '' }}" href="{{ route('area-assignments.index', ['type' => 'officer']) }}">Enforcers</a>
-                        </div>
-                    </details>
+                  
                     <details class="nav-dropdown" @if ($activePage === 'attendance') open @endif>
                         <summary class="nav-item {{ $activePage === 'attendance' ? 'is-active' : '' }}">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
@@ -118,6 +110,10 @@
                             <a class="nav-subitem {{ request('type') === 'enforcer' ? 'is-active' : '' }}" href="{{ route('dashboard.attendance', ['type' => 'enforcer']) }}">Enforcers</a>
                         </div>
                     </details>
+                      <a class="nav-item {{ $activePage === 'area-assignments' ? 'is-active' : '' }}" href="{{ route('area-assignments.index') }}">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 20h16M6 17V7l6-4 6 4v10" /><path d="M9 10h6M9 14h6" /></svg>
+                        <span class="nav-text">Area Assignments</span>
+                    </a>
                     <a class="nav-item {{ $activePage === 'audit-logs' ? 'is-active' : '' }}" href="{{ route('dashboard.audit-logs') }}">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M6 3h9l3 3v15H6z"/><path d="M9 10h6M9 14h6M9 18h4M14 3v4h4"/></svg>
                         <span class="nav-text">Audit Log</span>

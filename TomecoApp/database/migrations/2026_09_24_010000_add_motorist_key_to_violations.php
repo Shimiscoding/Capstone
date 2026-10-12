@@ -14,7 +14,8 @@ return new class extends Migration
             $table->string('motorist_key', 64)->nullable()->index()->after('enforcer_signature');
         });
 
-        Violation::query()->orderBy('id')->each(function (Violation $violation): void {
+        // This historical migration runs before the table is renamed and split.
+        (new Violation)->setTable('violations')->newQuery()->without('issuedViolations')->orderBy('id')->each(function (Violation $violation): void {
             DB::table('violations')->where('id', $violation->id)->update([
                 'motorist_key' => Violation::makeMotoristKey($violation->license_number, $violation->full_name),
             ]);

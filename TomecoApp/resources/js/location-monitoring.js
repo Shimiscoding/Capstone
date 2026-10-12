@@ -8,6 +8,7 @@ if (root) {
     const thresholds = JSON.parse(root.dataset.thresholds);
     const officers = new Map();
     const officerMarkers = {};
+    const portraitImages = new Map();
     const subscriptions = new Set();
     let authorizedTeamIds = [];
     let map;
@@ -44,11 +45,32 @@ if (root) {
     });
     const markerIcon = status => ({ path: google.maps.SymbolPath.CIRCLE, scale: 10, fillColor: colors[status], fillOpacity: 1, strokeColor: '#fff', strokeWeight: 3 });
 
+    const avatar = officer => `<span class="location-avatar"><span>${escapeHtml(officer.name.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join(''))}</span>${officer.profile_photo_url ? `<img src="${escapeHtml(officer.profile_photo_url)}" alt="" onerror="this.remove()">` : ''}</span>`;
+    function portraitIcon(officer) {
+        const url = officer.profile_photo_url;
+        if (!url) return markerIcon(officer.status);
+        if (!portraitImages.has(url)) {
+            portraitImages.set(url, null);
+            const image = new Image();
+            image.onload = () => { portraitImages.set(url, image); upsertMarker(officers.get(Number(officer.id)) || officer); };
+            image.src = url;
+        }
+        const image = portraitImages.get(url);
+        if (!image) return markerIcon(officer.status);
+        const canvas = document.createElement('canvas'); canvas.width = canvas.height = 80;
+        const ctx = canvas.getContext('2d');
+        ctx.save(); ctx.beginPath(); ctx.arc(40, 40, 34, 0, Math.PI * 2); ctx.clip();
+        const size = Math.min(image.naturalWidth, image.naturalHeight);
+        ctx.drawImage(image, (image.naturalWidth - size) / 2, (image.naturalHeight - size) / 2, size, size, 6, 6, 68, 68);
+        ctx.restore(); ctx.beginPath(); ctx.arc(40, 40, 36, 0, Math.PI * 2); ctx.strokeStyle = colors[officer.status]; ctx.lineWidth = 6; ctx.stroke();
+        return {url: canvas.toDataURL(), scaledSize: new google.maps.Size(40, 40), anchor: new google.maps.Point(20, 20)};
+    }
+
     function infoContent(officer) {
         const speed = officer.speed == null ? '' : `<dt>Speed</dt><dd>${(officer.speed * 3.6).toFixed(1)} km/h</dd>`;
         const accuracy = officer.accuracy == null ? '' : `<dt>GPS Accuracy</dt><dd>±${Math.round(officer.accuracy)} m${officer.low_accuracy ? ' · Low accuracy' : ''}</dd>`;
         const personnel = officer.personnel_id ? `<dt>Personnel ID</dt><dd>${escapeHtml(officer.personnel_id)}</dd>` : '';
-        return `<div class="officer-info"><h3>${escapeHtml(officer.name)}</h3><span class="map-status-label status-${officer.status}">${statusText[officer.status]}</span><dl>${personnel}<dt>Team</dt><dd>${escapeHtml(officer.team)}</dd><dt>Assigned Area</dt><dd>${escapeHtml(officer.area || 'Not assigned')}</dd><dt>Supervisor</dt><dd>${escapeHtml(officer.supervisor || 'Not assigned')}</dd><dt>Time In</dt><dd>${officer.time_in ? new Date(officer.time_in).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}) : 'Unavailable'}</dd><dt>Last Updated</dt><dd>${ageText(officer.received_at)}</dd>${accuracy}${speed}</dl><a href="${escapeHtml(officer.details_url)}">View Officer Details</a></div>`;
+        return `<div class="officer-info">${avatar(officer)}<h3>${escapeHtml(officer.name)}</h3><span class="map-status-label status-${officer.status}">${statusText[officer.status]}</span><dl>${personnel}<dt>Team</dt><dd>${escapeHtml(officer.team)}</dd><dt>Assigned Area</dt><dd>${escapeHtml(officer.area || 'Not assigned')}</dd><dt>Supervisor</dt><dd>${escapeHtml(officer.supervisor || 'Not assigned')}</dd><dt>Time In</dt><dd>${officer.time_in ? new Date(officer.time_in).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}) : 'Unavailable'}</dd><dt>Last Updated</dt><dd>${ageText(officer.received_at)}</dd>${accuracy}${speed}</dl><a href="${escapeHtml(officer.details_url)}">View Officer Details</a></div>`;
     }
     function selectOfficer(id) {
         const officer = officers.get(Number(id));
@@ -62,16 +84,16 @@ if (root) {
         const position = {lat: Number(officer.latitude), lng: Number(officer.longitude)};
         if (officerMarkers[officer.id]) {
             officerMarkers[officer.id].setPosition(position);
-            officerMarkers[officer.id].setIcon(markerIcon(officer.status));
+            officerMarkers[officer.id].setIcon(portraitIcon(officer));
             officerMarkers[officer.id].setTitle(`${officer.name} — ${statusText[officer.status]}`);
         } else {
-            const marker = new google.maps.Marker({map, position, icon: markerIcon(officer.status), title: `${officer.name} — ${statusText[officer.status]}`});
+            const marker = new google.maps.Marker({map, position, icon: portraitIcon(officer), title: `${officer.name} — ${statusText[officer.status]}`});
             marker.addListener('click', () => selectOfficer(officer.id)); officerMarkers[officer.id] = marker;
         }
     }
     function renderList() {
         const visible = filtered(); elements.officerCount.textContent = `${visible.length} shown`;
-        elements.officerList.innerHTML = visible.length ? visible.map(officer => `<button type="button" class="officer-row ${selectedId === officer.id ? 'is-selected' : ''}" data-officer-id="${officer.id}"><span class="status-dot status-${officer.status}"></span><span class="officer-copy"><strong>${escapeHtml(officer.name)}</strong>${officer.personnel_id ? `<small>${escapeHtml(officer.personnel_id)}</small>` : ''}<small>${escapeHtml(officer.team)}${officer.area ? ` · ${escapeHtml(officer.area)}` : ''}</small><small class="officer-age">${statusText[officer.status]} · ${ageText(officer.received_at)}</small></span>${officer.low_accuracy ? '<span class="accuracy-alert" title="Low GPS accuracy">!</span>' : ''}</button>`).join('') : `<div class="location-empty">${elements.teamFilter.value ? 'No active officers found for this team.' : 'No officers are currently sharing their location.'}</div>`;
+        elements.officerList.innerHTML = visible.length ? visible.map(officer => `<button type="button" class="officer-row ${selectedId === officer.id ? 'is-selected' : ''}" data-officer-id="${officer.id}">${avatar(officer)}<span class="status-dot status-${officer.status}"></span><span class="officer-copy"><strong>${escapeHtml(officer.name)}</strong>${officer.personnel_id ? `<small>${escapeHtml(officer.personnel_id)}</small>` : ''}<small>${escapeHtml(officer.team)}${officer.area ? ` · ${escapeHtml(officer.area)}` : ''}</small><small class="officer-age">${statusText[officer.status]} · ${ageText(officer.received_at)}</small></span>${officer.low_accuracy ? '<span class="accuracy-alert" title="Low GPS accuracy">!</span>' : ''}</button>`).join('') : `<div class="location-empty">${elements.teamFilter.value ? 'No active officers found for this team.' : 'No officers are currently sharing their location.'}</div>`;
         elements.officerList.querySelectorAll('[data-officer-id]').forEach(row => row.addEventListener('click', () => selectOfficer(row.dataset.officerId)));
         const visibleIds = new Set(visible.map(item => item.id));
         Object.entries(officerMarkers).forEach(([id, marker]) => marker.setMap(visibleIds.has(Number(id)) ? map : null));
@@ -154,5 +176,5 @@ if (root) {
         elements.liveConnection.className = 'connection-state is-warning';
         elements.liveConnection.innerHTML = '<span></span>Live monitoring could not initialize';
     }
-    loadLocations(); loadMap(); window.setInterval(() => { renderList(); updateSummary(); Object.values(officerMarkers).forEach(marker => { const officer = [...officers.values()].find(item => marker === officerMarkers[item.id]); if (officer) marker.setIcon(markerIcon(computedStatus(officer))); }); }, 10000);
+    loadLocations(); loadMap(); window.setInterval(() => { renderList(); updateSummary(); Object.values(officerMarkers).forEach(marker => { const officer = [...officers.values()].find(item => marker === officerMarkers[item.id]); if (officer) marker.setIcon(portraitIcon({...officer, status: computedStatus(officer)})); }); }, 10000);
 }

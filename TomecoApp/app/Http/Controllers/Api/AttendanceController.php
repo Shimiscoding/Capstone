@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\EnforcerAttendance;
 use App\Models\User;
 use App\Services\AttendanceRules;
+use App\Services\EnforcerDuty;
 use App\Services\OfficerLocationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -21,19 +22,12 @@ class AttendanceController extends Controller
             return response()->json(['message' => $error], 422);
         }
 
-        $attendance = EnforcerAttendance::firstOrCreate(
-            ['user_id' => $officer->id, 'attendance_date' => today()->toDateString()],
-            [
-                'supervisor_id' => $officer->supervisor_id,
-                'time_in' => now(),
-                'time_in_latitude' => $coordinates['latitude'] ?? null,
-                'time_in_longitude' => $coordinates['longitude'] ?? null,
-            ],
-        );
-
-        if (! $attendance->wasRecentlyCreated) {
-            return response()->json(['message' => 'You have already timed in today.'], 422);
-        }
+        $attendance = app(EnforcerDuty::class)->timeIn($officer, $rules, [
+            'supervisor_id' => $officer->supervisor_id,
+            'time_in' => now(),
+            'time_in_latitude' => $coordinates['latitude'] ?? null,
+            'time_in_longitude' => $coordinates['longitude'] ?? null,
+        ]);
 
         return response()->json([
             'message' => 'Time in recorded successfully.',
@@ -46,11 +40,10 @@ class AttendanceController extends Controller
         $officer = $this->officer($request);
         $coordinates = $this->coordinates($request);
 
-        if ($error = $rules->timeOutError($officer)) {
+        $attendance = $this->todayAttendance($officer);
+        if ($error = $rules->timeOutError($officer, session: $attendance?->session)) {
             return response()->json(['message' => $error], 422);
         }
-
-        $attendance = $this->todayAttendance($officer);
 
         if (! $attendance?->time_in) {
             return response()->json(['message' => 'You must time in before timing out.'], 422);
@@ -74,12 +67,20 @@ class AttendanceController extends Controller
         ]);
     }
 
-    public function getStatus(Request $request): JsonResponse
+    public function getStatus(Request $request, AttendanceRules $rules): JsonResponse
     {
         $officer = $this->officer($request);
         $attendance = $this->todayAttendance($officer);
 
         return response()->json([
+            'session' => $attendance?->session ?? $rules->session($officer),
+            'date' => $rules->date(),
+            'schedule' => $rules->schedule($officer),
+            'sessions' => collect(['morning', 'afternoon'])->mapWithKeys(function ($session) use ($officer, $rules) {
+                $record = EnforcerAttendance::where('user_id', $officer->id)->whereDate('attendance_date', $rules->date())->where('session', $session)->first();
+
+                return [$session => ['status' => $record?->time_out ? 'timed_out' : ($record?->time_in ? 'timed_in' : 'not_timed_in'), 'attendance' => $record ? $this->attendanceData($record) : null]];
+            }),
             'status' => match (true) {
                 $attendance?->time_out !== null => 'timed_out',
                 $attendance?->time_in !== null => 'timed_in',
@@ -100,14 +101,22 @@ class AttendanceController extends Controller
 
     private function todayAttendance(User $officer): ?EnforcerAttendance
     {
+        $active = $officer->enforcerAttendances()->whereDate('attendance_date', app(AttendanceRules::class)->date())
+            ->whereNotNull('time_in')->whereNull('time_out')->latest('time_in')->first();
+        if ($active) {
+            return $active;
+        }
+
         return EnforcerAttendance::where('user_id', $officer->id)
-            ->whereDate('attendance_date', today())
+            ->whereDate('attendance_date', app(AttendanceRules::class)->date())
+            ->where('session', app(AttendanceRules::class)->session($officer))
             ->first();
     }
 
     private function attendanceData(EnforcerAttendance $attendance): array
     {
         return [
+            'session' => $attendance->session,
             'date' => $attendance->attendance_date->toDateString(),
             'time_in' => $attendance->time_in?->toIso8601String(),
             'time_out' => $attendance->time_out?->toIso8601String(),

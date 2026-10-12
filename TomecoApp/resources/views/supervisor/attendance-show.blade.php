@@ -21,8 +21,7 @@
 
     <section class="table-card attendance-edit-card">
         <div class="supervisor-list-heading">
-            <div class="user-cell"><span
-                    class="table-avatar">{{ collect(explode(' ', $supervisor->fullName))->filter()->map(fn($part) => strtoupper(substr($part, 0, 1)))->take(2)->join('') ?:'S' }}</span><span><strong>{{ $supervisor->fullName }}</strong><small>{{ $supervisor->username ? '@' . $supervisor->username . ' · ' : '' }}{{ $supervisor->email }}</small></span>
+            <div class="user-cell"><x-user-avatar :user="$supervisor" /><span><strong>{{ $supervisor->fullName }}</strong><small>{{ $supervisor->username ? '@' . $supervisor->username . ' · ' : '' }}{{ $supervisor->email }}</small></span>
             </div>
         </div>
         <div class="table-scroll attendance-edit-table-scroll">

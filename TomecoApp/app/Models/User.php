@@ -67,15 +67,20 @@ class User extends Authenticatable
         'attendance_time_out_start',
         'attendance_time_out_end',
         'attendance_working_days',
+        'attendance_afternoon_time_in_start',
+        'attendance_afternoon_time_in_end',
+        'attendance_afternoon_time_out_start',
+        'attendance_afternoon_time_out_end',
         'password',
     ];
 
     protected $hidden = [
         'password',
         'remember_token',
+        'profile_photo_path',
     ];
 
-    protected $appends = ['fullName'];
+    protected $appends = ['fullName', 'profile_photo_url'];
 
     protected function casts(): array
     {
@@ -85,6 +90,11 @@ class User extends Authenticatable
             'attendance_working_days' => 'array',
             'signature' => 'encrypted',
         ];
+    }
+
+    public function getProfilePhotoUrlAttribute(): ?string
+    {
+        return $this->profile_photo_path ? route('users.profile-photo', ['user' => $this->id, 'v' => substr(hash('sha256', $this->profile_photo_path), 0, 12)]) : null;
     }
 
     public function getFullNameAttribute(): string
@@ -163,7 +173,7 @@ class User extends Authenticatable
 
     public function violations(): HasMany
     {
-        return $this->hasMany(Violation::class);
+        return $this->hasMany(Violation::class, 'enforcer_id');
     }
 
     public function currentLocation(): HasOne

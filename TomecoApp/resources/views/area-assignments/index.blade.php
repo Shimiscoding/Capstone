@@ -2,14 +2,17 @@
 
 @section('title', 'Area Assignments')
 @section('activePage', 'area-assignments')
-@section('workspaceClass', 'workspace-full-width')
+@section('workspaceClass', 'workspace-full-width area-assignment-workspace')
+@push('styles')
+    <link rel="stylesheet" href="{{ asset('css/area-assignments.css') }}?v={{ filemtime(public_path('css/area-assignments.css')) }}">
+@endpush
 
 @section('content')
     <div class="page-head users-page-head">
         <div class="users-heading-copy">
             <p class="eyebrow">Field operations</p>
-            <h1>{{ $canManage ? ($type === 'supervisor' ? 'Supervisor Area Assignments' : 'Enforcer Area Assignments') : 'My Assigned Area' }} <span class="users-heading-count">{{ $officers->total() }}</span></h1>
-            <p class="page-description">{{ $canManage ? 'Assign operational areas to '.($type === 'supervisor' ? 'supervisors.' : (auth()->user()->isAdmin() ? 'all traffic officers.' : 'officers in your team.')) : 'View the operational area assigned to you by your supervisor or administrator.' }}</p>
+            <h1>{{ $canManage ? 'Enforcer Area Assignments' : 'My Assigned Area' }} <span class="users-heading-count">{{ $officers->total() }}</span></h1>
+            <p class="page-description">{{ $canManage ? 'Assign operational areas to '.(auth()->user()->isAdmin() ? 'all enforcers.' : 'enforcers in your team.') : 'View the operational area assigned to you by your supervisor or administrator.' }}</p>
         </div>
     </div>
 
@@ -27,8 +30,9 @@
             <div class="users-toolbar-actions">
                 <label class="toolbar-search">
                     <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5"/><path d="m12.2 12.2 4 4"/></svg>
-                    <span class="sr-only">Search officers</span>
-                    <input name="search" type="search" value="{{ $search }}" placeholder="Search officer or username">
+                    <span class="sr-only">Search enforcers</span>
+                    <input name="search" type="search" id="areaOfficerSearch" value="{{ $search }}" placeholder="Search enforcer or username">
+                    <button class="area-search-clear" type="button" aria-label="Clear enforcer search" @if ($search === '') hidden @endif>&times;</button>
                 </label>
                 <label class="users-filter-chip">
                     <span>Area</span>
@@ -53,11 +57,11 @@
     <section class="table-card area-assignment-card {{ $canManage ? '' : 'area-assignment-readonly' }}">
         <div class="table-scroll">
             <table class="users-table area-assignment-table">
-                <thead><tr><th>Officer</th>@if(auth()->user()->isOfficer())<th>Supervisor / Team</th>@endif<th>Current Area</th><th>{{ $canManage ? 'Assign Area' : 'Assignment Status' }}</th></tr></thead>
+                <thead><tr><th>Enforcer</th>@if(auth()->user()->isOfficer())<th>Supervisor / Team</th>@endif<th>Current area</th><th>{{ $canManage ? 'Assign area' : 'Assignment Status' }}</th></tr></thead>
                 <tbody>
                     @forelse ($officers as $officer)
                         <tr>
-                            <td><div class="user-cell"><span class="table-avatar">{{ collect(explode(' ', $officer->fullName))->filter()->map(fn ($part) => strtoupper(substr($part, 0, 1)))->take(2)->join('') ?: 'O' }}</span><span><strong>{{ $officer->fullName }}</strong><small>{{ $officer->username ? '@'.$officer->username : $officer->email }}</small></span></div></td>
+                            <td><div class="user-cell"><x-user-avatar :user="$officer" /><span><strong>{{ $officer->fullName }}</strong><small>{{ $officer->username ? '@'.$officer->username : $officer->email }}</small></span></div></td>
                             @if(auth()->user()->isOfficer())
                                 <td><strong>{{ $officer->supervisor?->fullName ?? 'Unassigned' }}</strong><small class="area-table-muted">{{ $officer->supervisor ? 'Supervisor-led team' : 'No team assigned' }}</small></td>
                             @endif
@@ -73,7 +77,7 @@
                                             <option value="{{ $availableArea }}" @selected(old('area', $officer->area) === $availableArea)>{{ $availableArea }}</option>
                                         @endforeach
                                     </select>
-                                    <button type="submit">Save</button>
+                                    <button type="submit" aria-label="Save area for {{ $officer->fullName }}">Save</button>
                                 </form>
                                 @else
                                     <span class="area-table-muted">Contact your supervisor if this assignment needs to be changed.</span>
@@ -81,7 +85,7 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="{{ auth()->user()->isOfficer() ? 4 : 3 }}" class="empty-state"><strong>No officers found</strong><span>No officers match the selected filters.</span></td></tr>
+                        <tr><td colspan="{{ auth()->user()->isOfficer() ? 4 : 3 }}" class="empty-state"><strong>No enforcers found</strong><span>No enforcers match the selected filters.</span></td></tr>
                     @endforelse
                 </tbody>
             </table>
@@ -92,7 +96,7 @@
     @if ($canManage)
         <dialog class="attendance-restriction-modal area-add-modal" id="addAreaModal" aria-labelledby="addAreaTitle">
             <div class="attendance-modal-head">
-                <div><h2 id="addAreaTitle">Add operational area</h2><p>Create an area that can be selected when assigning staff.</p></div>
+                <div><h2 id="addAreaTitle">Add operational area</h2><p>Create an area that can be selected when assigning enforcers.</p></div>
                 <button type="button" data-close-area-modal aria-label="Close modal">&times;</button>
             </div>
             <form class="attendance-restriction-form" method="POST" action="{{ route('area-assignments.areas.store') }}">
@@ -108,6 +112,10 @@
 @if ($canManage)
 <script>
 (() => {
+    const search = document.getElementById('areaOfficerSearch');
+    const clearSearch = document.querySelector('.area-search-clear');
+    search.addEventListener('input', () => { clearSearch.hidden = !search.value; });
+    clearSearch.addEventListener('click', () => { search.value = ''; clearSearch.hidden = true; search.form.requestSubmit(); });
     const modal = document.getElementById('addAreaModal');
     document.getElementById('openAddArea')?.addEventListener('click', () => modal.showModal());
     modal.querySelectorAll('[data-close-area-modal]').forEach(button => button.addEventListener('click', () => modal.close()));

@@ -22,8 +22,7 @@
 
     <section class="table-card attendance-edit-card">
         <div class="supervisor-list-heading">
-            <div class="user-cell"><span
-                    class="table-avatar">{{ collect(explode(' ', $enforcer->fullName))->filter()->map(fn($part) => strtoupper(substr($part, 0, 1)))->take(2)->join('') ?:'E' }}</span><span><strong>{{ $enforcer->fullName }}</strong><small>{{ $enforcer->username ? '@' . $enforcer->username . ' · ' : '' }}{{ $enforcer->email }}</small></span>
+            <div class="user-cell"><x-user-avatar :user="$enforcer" /><span><strong>{{ $enforcer->fullName }}</strong><small>{{ $enforcer->username ? '@' . $enforcer->username . ' · ' : '' }}{{ $enforcer->email }}</small></span>
             </div>
         </div>
         <div class="table-scroll attendance-edit-table-scroll">
@@ -31,6 +30,7 @@
                 <thead>
                     <tr>
                         <th>Date</th>
+                        <th>Duty</th>
                         <th>Time In</th>
                         <th>Time In Location</th>
                         <th>Time Out</th>
@@ -46,6 +46,7 @@
                     @forelse($attendances as $attendance)
                         <tr>
                             <td>{{ $attendance->attendance_date->format('l, M d, Y') }}</td>
+                            <td>{{ ucfirst($attendance->session) }}</td>
                             <td>{{ $attendance->time_in?->format('h:i:s A') ?? '—' }}</td>
                             <td>
                                 @if ($attendance->time_in_latitude !== null && $attendance->time_in_longitude !== null)
@@ -92,7 +93,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="{{ auth()->user()->isAdmin() ? 8 : 7 }}" class="empty-state"><strong>No timestamp records</strong><span>This enforcer
+                            <td colspan="{{ auth()->user()->isAdmin() ? 9 : 8 }}" class="empty-state"><strong>No timestamp records</strong><span>This enforcer
                                     has not recorded attendance yet.</span></td>
                         </tr>
                     @endforelse

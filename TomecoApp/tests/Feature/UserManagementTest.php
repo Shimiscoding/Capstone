@@ -2,11 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Models\SupervisorAttendance;
 use App\Models\User;
 use App\Notifications\UserActivityNotification;
 use App\Notifications\UserCreatedNotification;
-use App\Models\SupervisorAttendance;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class UserManagementTest extends TestCase
@@ -75,7 +76,7 @@ class UserManagementTest extends TestCase
     {
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
         $admin->notifications()->create([
-            'id' => (string) \Illuminate\Support\Str::uuid(),
+            'id' => (string) Str::uuid(),
             'type' => UserCreatedNotification::class,
             'data' => [
                 'title' => 'Old notification',
@@ -368,7 +369,7 @@ class UserManagementTest extends TestCase
             ->assertSee('Supervisor management')
             ->assertSee('Detail Supervisor')
             ->assertSee('Supervisor profile, contact, and location details.')
-            ->assertSee('Downtown')
+            ->assertDontSeeText('Downtown')
             ->assertSee(route('dashboard.users.supervisors'), false)
             ->assertSee(route('dashboard.users.edit', ['user' => $supervisor, 'from' => 'supervisors']), false)
             ->assertDontSee('View the enforcers assigned to this supervisor.');

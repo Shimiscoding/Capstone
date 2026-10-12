@@ -53,6 +53,7 @@ class OfficerLocationMonitoringTest extends TestCase
     {
         [$supervisorA, $officerA] = $this->onDutyOfficer();
         [$supervisorB, $officerB] = $this->onDutyOfficer();
+        $officerA->forceFill(['profile_photo_path' => 'profile-photos/test.png'])->save();
         $this->locationFor($officerA, $supervisorA);
         $this->locationFor($officerB, $supervisorB);
 
@@ -60,6 +61,7 @@ class OfficerLocationMonitoringTest extends TestCase
             ->assertOk()
             ->assertJsonCount(1, 'officers')
             ->assertJsonPath('officers.0.id', $officerA->id)
+            ->assertJsonPath('officers.0.profile_photo_url', $officerA->profile_photo_url)
             ->assertJsonCount(1, 'teams')
             ->assertJsonPath('teams.0.id', $supervisorA->id);
         $this->actingAs($supervisorB)->getJson(route('location-monitoring.officers'))

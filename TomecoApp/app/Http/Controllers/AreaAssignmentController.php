@@ -19,7 +19,7 @@ class AreaAssignmentController extends Controller
 
         $search = trim((string) $request->query('search', ''));
         $area = trim((string) $request->query('area', ''));
-        $type = $viewer->isAdmin() && $request->query('type') === User::ROLE_SUPERVISOR ? User::ROLE_SUPERVISOR : User::ROLE_OFFICER;
+        $type = User::ROLE_OFFICER;
         $officerQuery = User::query()
             ->where('role', $type)
             ->when($viewer->isSupervisor(), fn ($query) => $query->where('supervisor_id', $viewer->id))

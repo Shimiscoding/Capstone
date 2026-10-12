@@ -2741,3 +2741,18 @@ a:focus-visible {
   outline: 0;
   box-shadow: none;
 }
+
+/* Two duty sessions remain scrollable on narrow and short screens. */
+.attendance-restriction-modal { max-height: calc(100dvh - 28px); overflow-y: auto; }
+#attendanceRestrictionErrors { margin: 16px 24px 0; padding: 10px; color: #991b1b; background: #fff1f1; font-size: 12px; }
+#morningDutyLabel { margin-top: 16px; font-size: 12px; }
+
+.attendance-afternoon-window { margin-top: 8px; }
+
+.user-photo-avatar{position:relative;overflow:hidden;flex-shrink:0}.user-photo-avatar img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:inherit}.profile-photo-field .user-photo-avatar{width:64px;height:64px;margin-bottom:8px}.profile-photo-field input[type=file]{max-width:100%}
+
+.location-avatar{position:relative;display:inline-flex;width:38px;height:38px;border-radius:50%;background:#e8edf4;color:#34445a;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden;font-weight:600}.location-avatar img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}.officer-info>.location-avatar{margin-bottom:8px}
+
+.photo-editor{min-width:0}.photo-editor-avatar{position:relative;display:flex;width:72px;height:72px;align-items:center;justify-content:center;border-radius:50%;background:var(--active,#fff1f1);color:var(--accent);font-size:22px;font-weight:600;border:1px solid var(--line);overflow:hidden}.photo-editor-avatar img[hidden]{display:none}.photo-editor-actions{display:flex;gap:12px;align-items:center;margin-top:14px}.photo-editor-actions button{border-radius:6px;padding:8px 12px;font-size:12px;font-weight:600;cursor:pointer}.photo-upload-button{border:1px solid var(--line-strong);background:var(--panel,#fff);color:var(--ink)}.photo-upload-button:hover{background:var(--active)}.photo-remove-button{background:transparent;border:0;color:var(--muted)}.photo-remove-button:hover{color:var(--accent)}.photo-editor-actions button[hidden]{display:none}.photo-editor-actions button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}.photo-editor-help{display:block;font-size:11px;color:var(--muted);margin-top:9px}.photo-editor-feedback{display:block;min-height:18px;margin-top:5px;font-size:11px;color:var(--muted)}.photo-editor-feedback.is-error{color:#b91c1c}.photo-editor input.sr-only{position:absolute!important;width:1px!important;height:1px!important;min-height:0!important;padding:0!important;overflow:hidden;clip:rect(0,0,0,0)}
+
+.profile-menu .profile{padding:0;overflow:hidden}.header-profile-avatar{display:grid;width:100%;height:100%;place-items:center;border-radius:inherit;color:inherit;font:inherit}.header-profile-avatar img{object-fit:cover}

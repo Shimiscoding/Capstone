@@ -4,13 +4,17 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Models\Violation;
+use App\Models\ViolationIssued;
 use App\Notifications\UserActivityNotification;
 use App\Notifications\UserCreatedNotification;
+use App\Services\ProfilePhoto;
 use App\Services\Settings;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\Rule;
 
@@ -36,10 +40,14 @@ class DashboardController extends Controller
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($query) use ($search): void {
                     $query->where('plate_number', 'like', "%{$search}%")
-                        ->orWhere('violation_type', 'like', "%{$search}%");
+                        ->orWhereHas('issuedViolations', fn ($offenses) => $offenses
+                            ->where('description_snapshot', 'like', "%{$search}%")
+                            ->orWhereHas('formOption', fn ($options) => $options->where('label', 'like', "%{$search}%"))
+                            ->orWhereHas('type', fn ($types) => $types->where('section_id', $search)));
                 });
             })
-            ->when($violationType !== '', fn ($query) => $query->where('violation_type', $violationType))
+            ->when($violationType !== '', fn ($query) => $query->whereHas('issuedViolations.formOption',
+                fn ($options) => $options->where('label', $violationType)))
             ->when($dateFrom !== '', fn ($query) => $query->whereDate('created_at', '>=', $dateFrom))
             ->when($dateTo !== '', fn ($query) => $query->whereDate('created_at', '<=', $dateTo));
 
@@ -51,7 +59,7 @@ class DashboardController extends Controller
             'violationType' => $violationType,
             'dateFrom' => $dateFrom,
             'dateTo' => $dateTo,
-            'violationTypes' => Violation::query()->select('violation_type')->distinct()->orderBy('violation_type')->pluck('violation_type'),
+            'violationTypes' => ViolationIssued::query()->whereHas('ticketItems')->orderBy('sort_order')->pluck('label'),
             'totalViolations' => (clone $summaryQuery)->count(),
             'violationsThisMonth' => (clone $summaryQuery)
                 ->whereBetween('created_at', [now()->startOfMonth(), now()->endOfMonth()])
@@ -90,52 +98,96 @@ class DashboardController extends Controller
     public function analytics(Request $request, Settings $settings): View
     {
         abort_if($request->user()->isSupervisor(), 403);
-        $period = in_array($request->query('period'), ['daily', 'monthly', 'yearly'], true)
-            ? $request->query('period')
-            : 'daily';
-        $buckets = match ($period) {
-            'monthly' => collect(range(11, 0))->map(function (int $monthsAgo): array {
-                $date = now()->subMonths($monthsAgo);
-
-                return ['label' => $date->format('M'), 'date' => $date->format('F Y'), 'start' => $date->copy()->startOfMonth(), 'end' => $date->copy()->endOfMonth()];
-            }),
-            'yearly' => collect(range(4, 0))->map(function (int $yearsAgo): array {
-                $date = now()->subYears($yearsAgo);
-
-                return ['label' => $date->format('Y'), 'date' => $date->format('Y'), 'start' => $date->copy()->startOfYear(), 'end' => $date->copy()->endOfYear()];
-            }),
-            default => collect(range(6, 0))->map(function (int $daysAgo): array {
-                $date = now()->subDays($daysAgo);
-
-                return ['label' => $date->format('D'), 'date' => $date->format('M d'), 'start' => $date->copy()->startOfDay(), 'end' => $date->copy()->endOfDay()];
-            }),
+        $summaryRange = $request->query('summary', 'today');
+        $summaryRange = $summaryRange === 'days' ? 'week' : $summaryRange;
+        $summaryRange = in_array($summaryRange, ['today', 'week', 'month', 'year', 'all'], true) ? $summaryRange : 'today';
+        $localNow = now('Asia/Manila');
+        $start = match ($summaryRange) {
+            'week' => $localNow->copy()->startOfWeek(),
+            'month' => $localNow->copy()->startOfMonth(),
+            'year' => $localNow->copy()->startOfYear(),
+            'all' => collect([Violation::query()->min('created_at'), User::query()->min('created_at')])->filter()->min(),
+            default => $localNow->copy()->startOfDay(),
         };
+        if ($summaryRange === 'all') {
+            $start = $start ? Carbon::parse($start, config('app.timezone'))->setTimezone('Asia/Manila')->startOfYear() : $localNow->copy()->startOfYear();
+        }
+        $rangeStart = $start->copy()->setTimezone(config('app.timezone'));
+        $rangeEnd = $localNow->copy()->setTimezone(config('app.timezone'));
+        $buckets = collect();
+        $cursor = $start->copy();
+        while ($cursor->lte($localNow)) {
+            $end = match ($summaryRange) {
+                'today' => $cursor->copy()->endOfHour(),
+                'year' => $cursor->copy()->endOfMonth(),
+                'all' => $cursor->copy()->endOfYear(),
+                default => $cursor->copy()->endOfDay(),
+            };
+            $buckets->push(['label' => $cursor->format(match ($summaryRange) {
+                'today' => 'H:00', 'year' => 'M', 'all' => 'Y', default => 'M d',
+            }), 'date' => $cursor->format('M d, Y H:i'),
+                'start' => $cursor->copy()->setTimezone(config('app.timezone')),
+                'end' => $end->min($localNow)->setTimezone(config('app.timezone'))]);
+            match ($summaryRange) {
+                'today' => $cursor->addHour(), 'year' => $cursor->addMonthNoOverflow(),
+                'all' => $cursor->addYear(), default => $cursor->addDay(),
+            };
+        }
         $dailyViolations = $buckets->map(fn (array $item): array => $item + [
             'value' => Violation::query()->whereBetween('created_at', [$item['start'], $item['end']])->count(),
         ]);
         $dailyUsers = $buckets->map(fn (array $item): array => $item + [
             'value' => User::query()->whereBetween('created_at', [$item['start'], $item['end']])->count(),
         ]);
-        $vehicleTrends = Violation::query()
+        $periodTickets = Violation::query()->whereBetween('created_at', [$rangeStart, $rangeEnd]);
+        $summaryTotal = (clone $periodTickets)->count();
+        $summaryResolved = (clone $periodTickets)->where('status', 'paid')->count();
+        $summary = ['total' => $summaryTotal, 'resolved' => $summaryResolved, 'pending' => $summaryTotal - $summaryResolved,
+            'enforcers' => (clone $periodTickets)->whereHas('enforcer', fn ($query) => $query->where('role', User::ROLE_OFFICER))->distinct()->count('enforcer_id')];
+        $description = match ($summaryRange) {
+            'today' => 'today', 'week' => 'this week', 'month' => 'this month', 'year' => 'this year', 'all' => 'all time',
+        };
+        $periodViolationTotal = (clone $periodTickets)->count();
+        $resolvedTickets = (clone $periodTickets)->where('status', 'paid')->count();
+        $activeEnforcers = (clone $periodTickets)
+            ->whereHas('enforcer', fn ($query) => $query->where('role', User::ROLE_OFFICER))
+            ->distinct()->count('enforcer_id');
+        // Count each ticket once per common group even when it cites several sections.
+        $violationTrends = DB::table('Ticket_issued as tickets')
+            ->join('ticket_violation_items as offenses', 'offenses.ticket_issued_id', '=', 'tickets.id')
+            ->join('violation_issued as options', 'options.id', '=', 'offenses.violation_issued_id')
+            ->whereBetween('tickets.created_at', [$rangeStart, $rangeEnd])
+            ->selectRaw('options.label as violation_type, COUNT(DISTINCT tickets.id) as total')
+            ->selectRaw("COUNT(DISTINCT CASE WHEN tickets.status = 'paid' THEN tickets.id END) as resolved")
+            ->groupBy('options.id', 'options.label')->orderByDesc('total')->orderBy('options.label')
+            ->get();
+        $otherViolationTickets = (clone $periodTickets)->whereDoesntHave('issuedViolations.formOption',
+            fn ($options) => $options->whereIn('label', $violationTrends->pluck('violation_type')))->count();
+        $vehicleTrends = (clone $periodTickets)
             ->selectRaw('vehicle_type, COUNT(*) as total')
             ->whereNotNull('vehicle_type')
             ->where('vehicle_type', '!=', '')
-            ->whereBetween('created_at', [$buckets->first()['start'], $buckets->last()['end']])
             ->groupBy('vehicle_type')
             ->orderByDesc('total')
+            ->orderBy('vehicle_type')
             ->limit(10)
             ->get();
 
         return view('dashboard.analytics', [
             'dailyViolations' => $dailyViolations,
             'dailyUsers' => $dailyUsers,
-            'period' => $period,
+            'summary' => $summary,
+            'summaryRange' => $summaryRange,
+            'summaryDescription' => $description,
             'vehicleTrends' => $vehicleTrends,
-            'periodViolationTotal' => $dailyViolations->sum('value'),
+            'periodViolationTotal' => $periodViolationTotal,
+            'activeEnforcers' => $activeEnforcers,
+            'pendingTickets' => $periodViolationTotal - $resolvedTickets,
+            'resolvedTickets' => $resolvedTickets,
+            'violationTrends' => $violationTrends,
+            'otherViolationTickets' => $otherViolationTickets,
             'periodUserTotal' => $dailyUsers->sum('value'),
-            'periodDescription' => match ($period) {
-                'monthly' => 'last 12 months', 'yearly' => 'last 5 years', default => 'last 7 days'
-            },
+            'periodDescription' => $description,
         ]);
     }
 
@@ -388,6 +440,7 @@ class DashboardController extends Controller
         $this->ensureAdmin($request);
 
         $attributes = $request->validate([
+            ...ProfilePhoto::rules(),
             'fullName' => ['sometimes', 'string', 'max:255'],
             'firstName' => ['required_without:fullName', 'string', 'max:100'],
             'middleName' => ['nullable', 'string', 'max:100'],
@@ -395,7 +448,7 @@ class DashboardController extends Controller
             'nameExtension' => ['nullable', 'string', 'max:20'],
             'username' => ['nullable', 'string', 'max:100', 'regex:/^[A-Za-z0-9._-]+$/', 'unique:users,username'],
             'address' => ['nullable', 'string', 'max:255'],
-            'area' => ['nullable', 'string', 'max:100'],
+            'area' => ['exclude'],
             'supervisor_id' => ['exclude_unless:role,'.User::ROLE_OFFICER, 'nullable', Rule::exists('users', 'id')->where('role', User::ROLE_SUPERVISOR)],
             'phoneNumber' => ['required', 'string', 'regex:/^09\d{9}$/', 'unique:users,phoneNumber'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
@@ -406,8 +459,11 @@ class DashboardController extends Controller
         ]);
 
         $attributes['supervisor_id'] = $attributes['role'] === User::ROLE_OFFICER ? ($attributes['supervisor_id'] ?? null) : null;
+        if ($attributes['role'] !== User::ROLE_OFFICER) {
+            $attributes['area'] = null;
+        }
 
-        $createdUser = User::create($attributes);
+        $createdUser = app(ProfilePhoto::class)->save(new User, $attributes, $request);
         Notification::send(User::where('role', User::ROLE_ADMIN)->get(), new UserCreatedNotification($createdUser));
 
         $destination = match ($attributes['user_section'] ?? null) {
@@ -453,6 +509,7 @@ class DashboardController extends Controller
         $this->ensureAdmin($request);
 
         $attributes = $request->validate([
+            ...ProfilePhoto::rules(),
             'fullName' => ['sometimes', 'string', 'max:255'],
             'firstName' => ['required_without:fullName', 'string', 'max:100'],
             'middleName' => ['nullable', 'string', 'max:100'],
@@ -460,7 +517,7 @@ class DashboardController extends Controller
             'nameExtension' => ['nullable', 'string', 'max:20'],
             'username' => ['nullable', 'string', 'max:100', 'regex:/^[A-Za-z0-9._-]+$/', Rule::unique('users', 'username')->ignore($user)],
             'address' => ['nullable', 'string', 'max:255'],
-            'area' => ['nullable', 'string', 'max:100'],
+            'area' => ['exclude'],
             'supervisor_id' => ['exclude_unless:role,'.User::ROLE_OFFICER, 'nullable', Rule::exists('users', 'id')->where('role', User::ROLE_SUPERVISOR)],
             'phoneNumber' => ['required', 'string', 'regex:/^09\d{9}$/', Rule::unique('users', 'phoneNumber')->ignore($user)],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user)],
@@ -472,12 +529,15 @@ class DashboardController extends Controller
         ]);
 
         $attributes['supervisor_id'] = $attributes['role'] === User::ROLE_OFFICER ? ($attributes['supervisor_id'] ?? null) : null;
+        if ($attributes['role'] !== User::ROLE_OFFICER) {
+            $attributes['area'] = null;
+        }
 
         if (blank($attributes['password'] ?? null)) {
             unset($attributes['password']);
         }
 
-        $user->update($attributes);
+        app(ProfilePhoto::class)->save($user, $attributes, $request);
         Notification::send(
             User::where('role', User::ROLE_ADMIN)->get(),
             new UserActivityNotification('updated', $user->fullName, $user->role),

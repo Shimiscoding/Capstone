@@ -5,10 +5,12 @@ namespace App\Http\Controllers;
 use App\Models\EnforcerAttendance;
 use App\Models\User;
 use App\Services\AttendanceRules;
+use App\Services\EnforcerDuty;
 use App\Services\OfficerLocationService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class EnforcerAttendanceController extends Controller
 {
@@ -61,7 +63,7 @@ class EnforcerAttendanceController extends Controller
             'enforcer' => $user,
             'attendances' => $user->enforcerAttendances()
                 ->with('supervisor')
-                ->latest('attendance_date')
+                ->latest('attendance_date')->latest('time_in')
                 ->paginate(20)
                 ->withQueryString(),
         ]);
@@ -73,13 +75,10 @@ class EnforcerAttendanceController extends Controller
         if ($error = $rules->timeInError($user)) {
             return back()->with('enforcer_attendance_error', $error);
         }
-        $attendance = EnforcerAttendance::firstOrCreate(
-            ['user_id' => $user->id, 'attendance_date' => today()->toDateString()],
-            ['supervisor_id' => $request->user()->id, 'time_in' => now()],
-        );
-
-        if (! $attendance->wasRecentlyCreated) {
-            return back()->with('enforcer_attendance_error', $user->fullName.' has already timed in today.');
+        try {
+            app(EnforcerDuty::class)->timeIn($user, $rules, ['supervisor_id' => $request->user()->id, 'time_in' => now()]);
+        } catch (ValidationException $exception) {
+            return back()->with('enforcer_attendance_error', $exception->validator->errors()->first());
         }
 
         return back()->with('enforcer_attendance_success', 'Time in recorded for '.$user->fullName.'.');
@@ -89,11 +88,11 @@ class EnforcerAttendanceController extends Controller
     {
         $this->ensureAssignedEnforcer($request, $user);
 
-        if ($error = $rules->timeOutError($user)) {
+        $attendance = $user->enforcerAttendances()->whereDate('attendance_date', $rules->date())->whereNotNull('time_in')->whereNull('time_out')->latest('time_in')->first()
+            ?? EnforcerAttendance::where('user_id', $user->id)->whereDate('attendance_date', $rules->date())->where('session', $rules->session($user))->first();
+        if ($error = $rules->timeOutError($user, session: $attendance?->session)) {
             return back()->with('enforcer_attendance_error', $error);
         }
-
-        $attendance = EnforcerAttendance::where('user_id', $user->id)->whereDate('attendance_date', today())->first();
 
         if (! $attendance?->time_in) {
             return back()->with('enforcer_attendance_error', $user->fullName.' must time in before timing out.');

@@ -25,8 +25,7 @@
     </div>
     <br>
     <section class="create-user-card staff-detail-card">
-        <div class="staff-detail-heading"><span
-                class="table-avatar">{{ collect(explode(' ', $staffUser->fullName))->filter()->map(fn($part) => strtoupper(substr($part, 0, 1)))->take(2)->join('') ?:'U' }}</span>
+        <div class="staff-detail-heading"><x-user-avatar :user="$staffUser" />
             <div>
                 <h2>{{ $staffUser->fullName }}</h2>
                 <p><span class="role-badge role-{{ $staffUser->role }}">{{ $sectionLabel }}</span> <span
@@ -59,10 +58,12 @@
                     </dd>
                 </div>
             @endif
+            @if ($staffUser->isOfficer())
             <div>
                 <dt>Area</dt>
                 <dd>{{ $staffUser->area ?: '—' }}</dd>
             </div>
+            @endif
             <div>
                 <dt>Address</dt>
                 <dd>{{ $staffUser->address ?: '—' }}</dd>

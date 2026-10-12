@@ -15,7 +15,7 @@ class UpdateAreaAssignmentRequest extends FormRequest
 
         return $viewer instanceof User
             && $staff instanceof User
-            && ($staff->isOfficer() || $staff->isSupervisor())
+            && $staff->isOfficer()
             && ($viewer->isAdmin() || ($viewer->isSupervisor() && $staff->isOfficer() && $staff->supervisor_id === $viewer->id));
     }
 

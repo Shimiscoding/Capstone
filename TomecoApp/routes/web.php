@@ -8,6 +8,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EnforcerAttendanceController;
 use App\Http\Controllers\LocationMonitoringController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\ProfilePhotoController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\SupervisorAttendanceController;
 use App\Http\Controllers\SupervisorTeamController;
@@ -29,6 +30,8 @@ Route::middleware('guest')->controller(AuthController::class)->group(function ()
     Route::get('/register', 'showRegister')->name('register');
     Route::post('/register', 'register')->name('register.store');
 });
+
+Route::get('/users/{user}/profile-photo', [ProfilePhotoController::class, 'show'])->middleware('auth:sanctum')->name('users.profile-photo');
 
 Route::middleware('auth')->group(function (): void {
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');

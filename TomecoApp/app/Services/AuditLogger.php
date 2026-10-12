@@ -8,6 +8,9 @@ use App\Models\Setting;
 use App\Models\SupervisorAttendance;
 use App\Models\User;
 use App\Models\Violation;
+use App\Models\ViolationIssued;
+use App\Models\ViolationType;
+use App\Models\TicketViolationItem;
 use DateTimeInterface;
 use Illuminate\Contracts\Support\Arrayable;
 use Illuminate\Database\Eloquent\Model;
@@ -21,6 +24,9 @@ class AuditLogger
     public const AUDITABLE_TYPES = [
         User::class,
         Violation::class,
+        ViolationIssued::class,
+        TicketViolationItem::class,
+        ViolationType::class,
         Setting::class,
         EnforcerAttendance::class,
         SupervisorAttendance::class,
@@ -81,6 +87,9 @@ class AuditLogger
         return match (true) {
             $model instanceof User => $model->fullName ?: $model->email,
             $model instanceof Violation => 'Violation ticket #'.str_pad((string) $model->getKey(), 7, '0', STR_PAD_LEFT),
+            $model instanceof TicketViolationItem => 'Cited offense on ticket #'.str_pad((string) $model->ticket_issued_id, 7, '0', STR_PAD_LEFT),
+            $model instanceof ViolationIssued => 'Ticket form option: '.$model->label,
+            $model instanceof ViolationType => $model->description,
             $model instanceof Setting => Str::headline(Str::after($model->key, '.')).' setting',
             $model instanceof EnforcerAttendance => 'Officer attendance #'.$model->getKey(),
             $model instanceof SupervisorAttendance => 'Supervisor attendance #'.$model->getKey(),

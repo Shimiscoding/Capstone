@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Services\ProfilePhoto;
 use App\Services\Settings;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -21,13 +22,14 @@ class ProfileController extends Controller
         /** @var User $user */
         $user = $request->user();
         $attributes = $request->validate([
+            ...ProfilePhoto::rules(),
             'firstName' => ['required', 'string', 'max:100'],
             'middleName' => ['nullable', 'string', 'max:100'],
             'lastName' => ['required', 'string', 'max:100'],
             'nameExtension' => ['nullable', 'string', 'max:20'],
             'username' => ['required', 'string', 'max:100', 'regex:/^[A-Za-z0-9._-]+$/', Rule::unique('users', 'username')->ignore($user)],
             'address' => ['required', 'string', 'max:255'],
-            'area' => ['required', 'string', 'max:100'],
+            'area' => ['exclude'],
             'phoneNumber' => ['required', 'string', 'regex:/^09\d{9}$/', Rule::unique('users', 'phoneNumber')->ignore($user)],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user)],
             'password' => ['nullable', 'confirmed', 'min:'.app(Settings::class)->get('security.password_min_length', 8)],
@@ -37,7 +39,7 @@ class ProfileController extends Controller
             unset($attributes['password']);
         }
 
-        $user->update($attributes);
+        app(ProfilePhoto::class)->save($user, $attributes, $request);
 
         return back()->with('success', 'Profile updated successfully.');
     }

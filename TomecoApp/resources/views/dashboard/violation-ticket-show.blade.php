@@ -42,7 +42,22 @@
         </section>
     </main>
     <aside class="violation-detail-card violation-citation-card"><header class="violation-detail-section-head"><h2>Citation summary</h2><span class="status-badge {{ $violation->status === 'paid' ? '' : 'status-pending' }}"><i></i>{{ ucfirst($violation->status ?: 'unpaid') }}</span></header><dl class="violation-detail-list">
-        <div><dt>Violation</dt><dd>{{ $violation->violation_type ?: 'Not recorded' }}</dd></div><div class="violation-fine-row"><dt>Assessed fine</dt><dd>&#8369;{{ number_format($violation->fine_amount, 2) }}</dd></div>
+        <div><dt>Cited violations</dt><dd>
+            @forelse ($violation->issuedViolations as $offense)
+                @php
+                    $normalizeLabel = fn ($text) => preg_replace('/[^\p{L}\p{N}]+/u', '', mb_strtolower($text ?? ''));
+                    $showDescription = filled($offense->description_snapshot)
+                        && $normalizeLabel($offense->description_snapshot) !== $normalizeLabel($offense->formOption->label);
+                @endphp
+                <p><strong>{{ $offense->formOption->label }}</strong><br>
+                    @if ($showDescription){{ $offense->description_snapshot }}<br>@endif
+                    <small>{{ $offense->type ? 'Sec. '.$offense->type->section_id : 'Section not recorded' }}</small>
+                    @if ($offense->remarks)<br><small>{{ $offense->remarks }}</small>@endif
+                </p>
+            @empty
+                Not recorded
+            @endforelse
+        </dd></div><div class="violation-fine-row"><dt>Assessed fine</dt><dd>&#8369;{{ number_format($violation->fine_amount, 2) }}</dd></div>
         <div><dt>Issued</dt><dd>{{ $violation->created_at?->format('M d, Y · h:i A') ?? 'Not recorded' }}</dd></div><div><dt>Location</dt><dd>{{ $violation->location ?: 'Not recorded' }}</dd></div>
         <div><dt>Issuing enforcer</dt><dd>{{ $violation->enforcer_name ?: $violation->enforcer?->fullName ?: 'Not recorded' }}</dd></div>
     </dl></aside>

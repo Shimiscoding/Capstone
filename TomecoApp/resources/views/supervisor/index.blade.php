@@ -88,8 +88,7 @@
                     @forelse($supervisor->enforcers as $enforcer)
                         <tr>
                             <td>
-                                <div class="user-cell"><span
-                                        class="table-avatar">{{ collect(explode(' ', $enforcer->fullName))->filter()->map(fn($part) => strtoupper(substr($part, 0, 1)))->take(2)->join('') ?:'E' }}</span><span><strong>{{ $enforcer->fullName }}</strong><small>{{ $enforcer->username ? '@' . $enforcer->username : 'No username' }}</small></span>
+                                <div class="user-cell"><x-user-avatar :user="$enforcer" /><span><strong>{{ $enforcer->fullName }}</strong><small>{{ $enforcer->username ? '@' . $enforcer->username : 'No username' }}</small></span>
                                 </div>
                             </td>
                             <td>{{ $enforcer->phoneNumber ?: '—' }}<br><small>{{ $enforcer->email }}</small></td>

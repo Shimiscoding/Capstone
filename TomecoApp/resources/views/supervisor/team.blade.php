@@ -40,8 +40,7 @@
                         @forelse($teamMembers as $enforcer)
                             <tr data-team-member="{{ \Illuminate\Support\Str::lower($enforcer->fullName.' '.$enforcer->username.' '.$enforcer->email) }}">
                                 <td>
-                                    <div class="user-cell"><span
-                                            class="table-avatar">{{ collect(explode(' ', $enforcer->fullName))->filter()->map(fn($part) => strtoupper(substr($part, 0, 1)))->take(2)->join('') ?:'E' }}</span><span><strong>{{ $enforcer->fullName }}</strong><small>{{ $enforcer->username ? '@' . $enforcer->username : $enforcer->email }}</small></span>
+                                    <div class="user-cell"><x-user-avatar :user="$enforcer" /><span><strong>{{ $enforcer->fullName }}</strong><small>{{ $enforcer->username ? '@' . $enforcer->username : $enforcer->email }}</small></span>
                                     </div>
                                 </td>
                                 <td>{{ $enforcer->phoneNumber ?: '—' }}</td>
@@ -93,8 +92,7 @@
                     @forelse($availableEnforcers as $enforcer)
                         <tr data-enforcer-name="{{ \Illuminate\Support\Str::lower($enforcer->fullName) }}">
                             <td>
-                                <div class="user-cell"><span
-                                        class="table-avatar">{{ collect(explode(' ', $enforcer->fullName))->filter()->map(fn($part) => strtoupper(substr($part, 0, 1)))->take(2)->join('') ?:'E' }}</span><span><strong>{{ $enforcer->fullName }}</strong><small>{{ $enforcer->username ? '@' . $enforcer->username : $enforcer->email }}</small></span>
+                                <div class="user-cell"><x-user-avatar :user="$enforcer" /><span><strong>{{ $enforcer->fullName }}</strong><small>{{ $enforcer->username ? '@' . $enforcer->username : $enforcer->email }}</small></span>
                                 </div>
                             </td>
                             <td>{{ $enforcer->phoneNumber ?: '—' }}</td>

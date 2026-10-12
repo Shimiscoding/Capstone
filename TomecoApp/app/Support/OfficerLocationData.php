@@ -14,6 +14,7 @@ class OfficerLocationData
         $onDuty = (bool) ($attendance?->time_in && ! $attendance?->time_out);
 
         return [
+            'profile_photo_url' => $officer->profile_photo_url,
             'id' => $officer->id, 'name' => $officer->fullName, 'personnel_id' => $officer->username,
             'team_id' => $officer->supervisor_id,
             'team' => $officer->supervisor?->fullName ? $officer->supervisor->fullName.' Team' : 'Unassigned',

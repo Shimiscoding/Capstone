@@ -49,7 +49,7 @@ class LocationMonitoringController extends Controller
     private function authorizedLocations(User $viewer): Builder
     {
         return OfficerLocation::query()->whereHas('officer', fn (Builder $query) => $query->where('role', User::ROLE_OFFICER)->when($viewer->isSupervisor(), fn (Builder $query) => $query->where('supervisor_id', $viewer->id)))
-            ->with(['officer.supervisor', 'officer.enforcerAttendances' => fn ($query) => $query->whereNotNull('time_in')->latest('attendance_date')->limit(1)]);
+            ->with(['officer.supervisor', 'officer.enforcerAttendances' => fn ($query) => $query->whereNotNull('time_in')->latest('time_in')->limit(1)]);
     }
 
     private function authorizeViewer(User $viewer): void

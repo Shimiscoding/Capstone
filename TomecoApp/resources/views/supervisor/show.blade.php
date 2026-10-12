@@ -45,8 +45,7 @@
                     @forelse($supervisor->enforcers as $enforcer)
                         <tr data-assigned-enforcer="{{ \Illuminate\Support\Str::lower($enforcer->fullName.' '.$enforcer->username.' '.$enforcer->email) }}">
                             <td>
-                                <div class="user-cell"><span
-                                        class="table-avatar">{{ collect(explode(' ', $enforcer->fullName))->filter()->map(fn($part) => strtoupper(substr($part, 0, 1)))->take(2)->join('') ?:'E' }}</span><span><strong>{{ $enforcer->fullName }}</strong><small>{{ $enforcer->username ? '@' . $enforcer->username : $enforcer->email }}</small></span>
+                                <div class="user-cell"><x-user-avatar :user="$enforcer" /><span><strong>{{ $enforcer->fullName }}</strong><small>{{ $enforcer->username ? '@' . $enforcer->username : $enforcer->email }}</small></span>
                                 </div>
                             </td>
                             <td>{{ $enforcer->phoneNumber ?: '—' }}<br><small>{{ $enforcer->email }}</small></td>
@@ -96,7 +95,7 @@
                 <tbody id="adminAvailableEnforcers">
                     @forelse($availableEnforcers as $enforcer)
                         <tr data-enforcer-name="{{ \Illuminate\Support\Str::lower($enforcer->fullName) }}">
-                            <td><div class="user-cell"><span class="table-avatar">{{ collect(explode(' ', $enforcer->fullName))->filter()->map(fn($part) => strtoupper(substr($part, 0, 1)))->take(2)->join('') ?: 'E' }}</span><span><strong>{{ $enforcer->fullName }}</strong><small>{{ $enforcer->username ? '@'.$enforcer->username : $enforcer->email }}</small></span></div></td>
+                            <td><div class="user-cell"><x-user-avatar :user="$enforcer" /><span><strong>{{ $enforcer->fullName }}</strong><small>{{ $enforcer->username ? '@'.$enforcer->username : $enforcer->email }}</small></span></div></td>
                             <td>{{ $enforcer->phoneNumber ?: '—' }}</td>
                             <td class="location-cell"><strong>{{ $enforcer->area ?: '—' }}</strong><small class="location-truncate">{{ $enforcer->address ?: 'No address' }}</small></td>
                             <td><form method="POST" action="{{ route('dashboard.users.supervisors.enforcers.assign', [$supervisor, $enforcer]) }}">@csrf<button class="team-add-button" type="submit">Add to team</button></form></td>

@@ -24,6 +24,10 @@
         };
 @endphp
 @section('title', isset($editedUser) ? 'Edit User' : 'Create ' . $sectionLabel)
+@section('workspaceClass', 'user-editor-workspace')
+@push('styles')
+    <link rel="stylesheet" href="{{ asset('css/user-editor.css') }}?v={{ filemtime(public_path('css/user-editor.css')) }}">
+@endpush
 @section('activePage', $userSection ?? null ? 'users-' . $userSection : 'users')
 
 @section('content')
@@ -37,7 +41,7 @@
         </div><a class="page-button" href="{{ $returnRoute }}">Back</a>
     </div>
     <div class="create-user-card">
-        <form method="POST"
+        <form novalidate method="POST" enctype="multipart/form-data"
             action="{{ isset($editedUser) ? route('dashboard.users.update', $editedUser) : route('dashboard.users.store') }}">
             @csrf @isset($editedUser)
                 @method('PUT')
@@ -48,6 +52,10 @@
             @if (($returnTo ?? null) === 'detail')
                 <input type="hidden" name="return_to" value="detail">
             @endif
+            <div class="user-editor-photo-header">
+                <x-profile-photo-field :user="$editedUser ?? null" />
+                <div class="user-editor-photo-copy"><span class="user-editor-role">{{ $sectionLabel }} account</span><h2>{{ $editedUser->fullName ?? 'Set up a new account' }}</h2><p>The photo will appear in staff tables and location monitoring.</p></div>
+            </div>
             <div class="user-form-grid">
                 <div class="form-section-heading"><span>1</span>
                     <div>
@@ -57,7 +65,7 @@
                 </div>
                 <div class="form-field"><label for="firstName">First name <b>Required</b></label><input id="firstName"
                         name="firstName" type="text" value="{{ old('firstName', $editedUser->firstName ?? '') }}"
-                        placeholder="e.g., Juan" autocomplete="given-name" required autofocus>
+                        placeholder="e.g., Juan" autocomplete="given-name" required>
                     @error('firstName')
                     <small class="field-error">{{ $message }}</small>@else<small class="field-help">Given name
                             only.</small>
@@ -103,13 +111,6 @@
                         <small class="field-error">{{ $message }}</small>
                     @enderror
                 </div>
-                <div class="form-field"><label for="area">Area <em>Optional</em></label><input id="area"
-                        name="area" type="text" value="{{ old('area', $editedUser->area ?? '') }}"
-                        placeholder="e.g., Area 1">
-                    @error('area')
-                        <small class="field-error">{{ $message }}</small>
-                    @enderror
-                </div>
                 @unless ($isRoleLocked)
                     <div class="form-section-heading"><span>2</span>
                         <div>
@@ -137,7 +138,7 @@
                         <option value="">No supervisor (unassigned)</option>
                         @foreach ($supervisors as $supervisor)
                             <option value="{{ $supervisor->id }}" @selected((string) old('supervisor_id', $editedUser->supervisor_id ?? '') === (string) $supervisor->id)>
-                                {{ $supervisor->fullName }}{{ $supervisor->area ? ' — ' . $supervisor->area : '' }}</option>
+                                {{ $supervisor->fullName }}</option>
                         @endforeach
                     </select>
                     @error('supervisor_id')

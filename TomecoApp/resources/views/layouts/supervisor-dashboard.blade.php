@@ -7,6 +7,7 @@
     <title>@yield('title', 'Dashboard') | TOMECO</title>
     <link rel="stylesheet" href="{{ asset('css/dashboard.css') }}?v={{ filemtime(public_path('css/dashboard.css')) }}">
     <link rel="icon" href="{{ asset('images/favicon.ico') }}">
+    @stack('styles')
 </head>
 
 <body>
@@ -52,7 +53,7 @@
             @include('dashboard.partials.notifications')
             <div class="profile-menu" id="profileMenu">
                 <button class="profile" id="profileMenuToggle" type="button" aria-label="Open account menu"
-                    aria-haspopup="menu" aria-expanded="false">{{ $initials ?: 'U' }}</button>
+                    aria-haspopup="menu" aria-expanded="false"><x-user-avatar :user="$user" class="header-profile-avatar" /></button>
                 <div class="profile-dropdown" id="profileDropdown" role="menu" hidden>
                     <div class="profile-dropdown-user">
                         <strong>{{ $user->fullName ?: 'User' }}</strong><small>{{ $user->email }}</small></div>

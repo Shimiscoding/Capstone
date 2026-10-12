@@ -37,7 +37,7 @@
                         $initials = collect(explode(' ', $enforcerName))->filter()->map(fn($part) => strtoupper(substr($part, 0, 1)))->take(2)->join('');
                     @endphp
                     <tr>
-                        <td><div class="user-cell"><span class="table-avatar">{{ $initials ?: 'E' }}</span><span><strong><a class="user-name-link" href="{{ route('supervisor.enforcers.attendance', $enforcer) }}">{{ $enforcerName }}</a></strong><small>{{ $enforcer->username ? '@'.$enforcer->username : $enforcer->email }}</small></span></div></td>
+                        <td><div class="user-cell"><x-user-avatar :user="$enforcer" /><span><strong><a class="user-name-link" href="{{ route('supervisor.enforcers.attendance', $enforcer) }}">{{ $enforcerName }}</a></strong><small>{{ $enforcer->username ? '@'.$enforcer->username : $enforcer->email }}</small></span></div></td>
                         <td>{{ number_format($enforcer->enforcer_attendances_count) }}</td>
                         <td>{{ $enforcer->enforcer_attendances_max_time_in ? \Illuminate\Support\Carbon::parse($enforcer->enforcer_attendances_max_time_in)->format('M d, Y h:i A') : '—' }}</td>
                         <td><div class="user-row-actions"><a class="user-action action-edit" href="{{ route('supervisor.enforcers.attendance', $enforcer) }}">View details</a></div></td>

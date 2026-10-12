@@ -2,13 +2,25 @@
 
 namespace App\Models;
 
+use App\Services\ViolationCatalog;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Validation\ValidationException;
 
 class Violation extends Model
 {
     use HasFactory;
+
+    // Keep the existing class/routes for compatibility with the mobile client.
+    protected $table = 'Ticket_issued';
+
+    protected $with = ['issuedViolations.type', 'issuedViolations.formOption'];
+
+    protected $appends = ['violation_type'];
+
+    private ?string $pendingViolationText = null;
 
     protected $fillable = [
         'enforcer_id',
@@ -78,5 +90,53 @@ class Violation extends Model
     public function enforcer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'enforcer_id');
+    }
+
+    public function issuedViolations(): HasMany
+    {
+        return $this->hasMany(TicketViolationItem::class, 'ticket_issued_id')->orderBy('id');
+    }
+
+    public function getViolationTypeAttribute(): string
+    {
+        return $this->pendingViolationText ?? $this->issuedViolations->pluck('description_snapshot')->implode(', ');
+    }
+
+    public function setViolationTypeAttribute(string $value): void
+    {
+        $this->pendingViolationText = $value;
+    }
+
+    public function save(array $options = [])
+    {
+        return $this->getConnection()->transaction(function () use ($options) {
+            // Older clients submit a label instead of catalog IDs. Never guess a section.
+            if ($this->pendingViolationText !== null && $this->exists && ($this->issuedViolations()->count() > 1
+                || $this->issuedViolations()->whereNotNull('violations_type_id')->exists())) {
+                throw ValidationException::withMessages(['violation_type' => 'Use the violations list to update a ticket with recorded sections or multiple offenses.']);
+            }
+            $saved = parent::save($options);
+            if ($saved && $this->pendingViolationText !== null) {
+                $labels = ViolationCatalog::legacyLabels($this->pendingViolationText);
+                foreach ($this->issuedViolations()->get() as $existing) {
+                    $existing->delete();
+                }
+                $seen = [];
+                foreach ($labels as $label) {
+                    $option = ViolationCatalog::formOptionFor($label);
+                    if (isset($seen[$option->id])) {
+                        continue;
+                    }
+                    $this->issuedViolations()->create([
+                        'violation_issued_id' => $option->id, 'violations_type_id' => null, 'description_snapshot' => $label,
+                    ]);
+                    $seen[$option->id] = true;
+                }
+                $this->pendingViolationText = null;
+                $this->unsetRelation('issuedViolations');
+            }
+
+            return $saved;
+        });
     }
 }

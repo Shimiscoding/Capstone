@@ -27,7 +27,7 @@ class DatabaseEncryptionTest extends TestCase
             'location' => 'Main Street',
         ]);
 
-        $stored = DB::table('violations')->find($violation->id);
+        $stored = DB::table('Ticket_issued')->find($violation->id);
 
         $this->assertNotSame('Juan', $stored->first_name);
         $this->assertNotSame('Dela', $stored->middle_name);
