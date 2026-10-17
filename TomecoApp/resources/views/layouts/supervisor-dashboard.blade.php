@@ -112,17 +112,19 @@
         (() => {
             const frame = document.querySelector('.app-frame');
             const toggle = document.getElementById('sidebarToggle');
-            let sidebarHidden = false;
+            const narrowSidebar = window.matchMedia('(max-width: 640px)');
+            let sidebarHidden = narrowSidebar.matches;
             try {
-                sidebarHidden = localStorage.getItem('tomeco-sidebar-hidden') === 'true';
+                if (!narrowSidebar.matches) sidebarHidden = localStorage.getItem('tomeco-sidebar-hidden') === 'true';
             } catch (error) {}
 
             const setSidebar = (hidden) => {
                 frame.classList.toggle('is-sidebar-hidden', hidden);
+                document.getElementById('dashboardSidebar').inert = hidden;
                 toggle.setAttribute('aria-expanded', String(!hidden));
                 toggle.setAttribute('aria-label', hidden ? 'Show sidebar' : 'Hide sidebar');
                 try {
-                    localStorage.setItem('tomeco-sidebar-hidden', String(hidden));
+                    if (!narrowSidebar.matches) localStorage.setItem('tomeco-sidebar-hidden', String(hidden));
                 } catch (error) {}
             };
 

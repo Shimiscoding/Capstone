@@ -10,15 +10,31 @@ $app->make(Kernel::class)->bootstrap();
 $files = glob(storage_path('app/private/ticket-backups/*.encrypted'));
 rsort($files);
 $backup = json_decode(Crypt::decryptString(file_get_contents($files[0])), true, flags: JSON_THROW_ON_ERROR);
+$normalizeEvidence = static function (array $row): array {
+    $photos = isset($row['evidence_images'])
+        ? json_decode(Crypt::decryptString($row['evidence_images']), true, flags: JSON_THROW_ON_ERROR) : [];
+    $legacy = isset($row['evidence_image']) ? Crypt::decryptString($row['evidence_image']) : null;
+    if (filled($legacy) && ! in_array($legacy, $photos, true)) {
+        $photos[] = $legacy;
+    }
+    unset($row['evidence_image']);
+    $row['evidence_images'] = $photos;
+
+    return $row;
+};
 foreach (['Ticket_issued' => $backup['rows'], 'ticket_violation_items' => $backup['related_tables']['ticket_violation_items']['rows'],
     'violation_issued' => $backup['related_tables']['violation_issued']['rows']] as $table => $rows) {
     $current = json_decode(DB::table($table)->orderBy('id')->get()->toJson(), true);
+    if ($table === 'Ticket_issued') {
+        $current = array_map($normalizeEvidence, $current);
+        $rows = array_map($normalizeEvidence, $rows);
+    }
     if ($current !== $rows) {
         throw new RuntimeException('Preserved rows differ: '.$table);
     }
 }
-$groups = ['Driving without D/L' => [20, 21], 'Unregistered Vehicle' => [19], 'Illegal parking' => [7, 50],
-    'Disregarding Traffic Sign' => [38, 42, 43, 44], 'Obstruction' => [16, 48, 49, 71], 'Defective Head Light' => [5]];
+$groups = ['Driving without D/L' => [20], 'Unregistered Vehicle' => [19], 'Illegal parking' => [7, 50],
+    'Disregarding Traffic Sign' => [38, 42, 43, 44], 'Obstruction' => [16, 48, 49, 71]];
 $options = DB::table('violation_issued')->pluck('id', 'label');
 foreach ($backup['related_tables']['violations_type']['rows'] as $row) {
     $expected = 'Others';

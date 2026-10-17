@@ -53,6 +53,12 @@ Controls use 6px corners; record surfaces use 8px corners. Pills are reserved fo
 
 Tables expose one explicit actions column. Evidence and signature panels always show a visible Recorded or Not recorded state.
 
+Home's recent ticket list previews the first three recorded violations and appends `...` when more exist. Supporting details show the driver name, labeled registered owner address, plate, and total fine. Missing owner addresses display `Not recorded`. Text wraps within the details column while status and date keep their own space. Complete violations remain available through Review tickets.
+
+Complete ticket details reuse `dashboard.violation-ticket-show` and the shared dashboard CSS. Observed and document plates have separate labels; registered owners have their own card apart from driver identity. Evidence photos appear in their submitted order, with numbered captions. Historical enforcer signatures use the ticket snapshot. Registration values wrap fully at desktop and narrow widths; no missing document data is inferred.
+
+Citation summaries show section numbers only when a section is recorded; omit the section line for form-only citations.
+
 Analytics Reports uses four compact summary cards, the existing red/blue activity chart, and overlapping vehicle circles as its signature. Period, View, and Chart type belong inside Performance Overview. Violation rankings use a semantic table with horizontal scrolling on narrow screens. The three vehicle circles show the leading types, with full labels and counts repeated below them and an explicit remainder for other or unrecorded types.
 
 The shared shell and tokens remain owned by `public/css/dashboard.css`; `public/css/analytics-reports.css` supplies report layout variants using its canvas, panel, text, muted, border, and accent variables. Chart series retain the existing Analytics palette. Report controls accept native select popups and their keyboard behavior.
@@ -67,4 +73,8 @@ My Profile uses a compact identity card with a round photo, calm personal-inform
 
 User creation and editing reuse the shared photo editor within a compact horizontal identity strip. Section headings use simple ruled dividers, quieter required/optional labels, and a responsive two-column field layout. The form retains existing role, team, and validation behavior.
 
+Staff profile views for enforcers, supervisors, and admins reuse the create/edit account layout in `public/css/user-editor.css`. A circular photo and role/status badges sit beside the account identity. Personal, contact, and account sections use the same ruled headings and two-column spacing, with semantic read-only values on quiet surfaces. Missing values are explicit; enforcer assignment links and existing edit/back routes remain available. Narrow screens stack the identity and details.
+
 Area Assignment uses a stable full-width search field with an explicit clear button, an area filter, and a primary Add area action. The compact table uses bounded assignment dropdowns, quieter area badges, and accessible per-enforcer save buttons. Native select behavior and existing assignment permissions remain unchanged.
+
+Attendance history reuses `components.attendance-history-table` for enforcers and supervisors. Date and weekday share a cell; map links sit beneath their matching timestamps. The table scrolls inside its card on narrow screens. Admins have visible Edit and Delete buttons in one Actions column, opening the shared attendance dialogs outside the scroll region. Dialogs reuse the attendance restriction surface and footer styles.

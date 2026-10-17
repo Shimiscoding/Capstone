@@ -35,8 +35,8 @@ class UserAttendanceRestrictionsTest extends TestCase
             ->assertDontSeeText('Table Supervisor');
         $this->actingAs($admin)->get(route('dashboard.attendance', ['type' => 'admin']))
             ->assertOk()
-            ->assertSeeText('Table Admin')
-            ->assertDontSeeText('Table Supervisor');
+            ->assertSeeText('Table Supervisor')
+            ->assertDontSeeText('Table Enforcer'); // Unsupported role filters fall back to supervisors.
 
         $this->actingAs($admin)->put(route('dashboard.attendance.restrictions.update', $supervisor), [
             'attendance_restrictions_enabled' => '1',

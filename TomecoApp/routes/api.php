@@ -7,12 +7,13 @@ use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\ViolationController;
 use App\Http\Controllers\Api\ViolationTypeController;
 use App\Http\Controllers\ProfilePhotoController;
+use App\Http\Middleware\EnsureApiAccountActive;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/auth/login', [AuthController::class, 'login']);
-Route::apiResource('users', UserController::class)->except(['store']);
 
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', EnsureApiAccountActive::class])->group(function () {
+    Route::apiResource('users', UserController::class);
     Route::post('/auth/profile-photo', [ProfilePhotoController::class, 'update']);
     Route::get('/auth/profile', [AuthController::class, 'profile']);
     Route::put('/auth/signature', [AuthController::class, 'updateSignature']);

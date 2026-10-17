@@ -6,11 +6,11 @@ use App\Models\AuditLog;
 use App\Models\EnforcerAttendance;
 use App\Models\Setting;
 use App\Models\SupervisorAttendance;
+use App\Models\TicketViolationItem;
 use App\Models\User;
 use App\Models\Violation;
 use App\Models\ViolationIssued;
 use App\Models\ViolationType;
-use App\Models\TicketViolationItem;
 use DateTimeInterface;
 use Illuminate\Contracts\Support\Arrayable;
 use Illuminate\Database\Eloquent\Model;
@@ -55,6 +55,13 @@ class AuditLogger
         $changes = collect($fields)->mapWithKeys(function (string $field) use ($model, $event): array {
             $old = $event === 'created' ? null : $model->getOriginal($field);
             $new = $event === 'deleted' ? null : $model->getAttribute($field);
+
+            // Evidence stays encrypted on the ticket. Audit digests identify changes
+            // without copying tens of megabytes into the audit trail on every save.
+            if (in_array($field, ['evidence_image', 'evidence_images'], true)) {
+                $old = self::evidenceSummary($old);
+                $new = self::evidenceSummary($new);
+            }
 
             return [$field => [
                 'old' => self::normalize($old),
@@ -106,5 +113,14 @@ class AuditLogger
             is_object($value) => (string) $value,
             default => $value,
         };
+    }
+
+    private static function evidenceSummary(mixed $value): ?array
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        return array_map(static fn (string $photo) => ['bytes' => strlen($photo), 'sha256' => hash('sha256', $photo)], is_array($value) ? $value : [$value]);
     }
 }

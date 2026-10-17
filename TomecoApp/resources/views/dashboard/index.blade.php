@@ -58,8 +58,16 @@
             </div>
             <div class="recent-list">
                 @forelse ($recentViolations as $violation)
+                    @php
+                        $violationLabels = $violation->issuedViolations->pluck('description_snapshot');
+                        $violationPreview = $violationLabels->take(3)->implode(', ');
+                        if ($violationLabels->count() > 3) {
+                            $violationPreview .= ' ...';
+                        }
+                    @endphp
                     <div class="recent-user"><span class="table-avatar">T</span><span
-                            class="recent-details"><strong>{{ $violation->violation_type }}</strong><small>{{ $violation->full_name }}
+                            class="recent-details"><strong>{{ $violationPreview }}</strong><small>{{ $violation->full_name }}
+                                &middot; Owner address: {{ $violation->registered_owner_address ?: 'Not recorded' }}
                                 &middot; {{ $violation->plate_number }} &middot;
                                 &#8369;{{ number_format($violation->fine_amount, 2) }}</small></span><span
                             class="recent-date">{{ ucfirst($violation->status) }}<br>{{ $violation->created_at?->format('M d, Y') }}</span>

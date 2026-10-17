@@ -7,9 +7,11 @@ use App\Models\SupervisorAttendance;
 use App\Models\User;
 use App\Notifications\AttendanceTimeOutUpdated;
 use App\Services\OfficerLocationService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class AdminAttendanceController extends Controller
@@ -48,21 +50,63 @@ class AdminAttendanceController extends Controller
     public function updateSupervisorTimeOut(
         Request $request,
         SupervisorAttendance $attendance,
-    ): RedirectResponse {
+    ): RedirectResponse|JsonResponse {
         $this->ensureAdmin($request);
         $this->updateTimeOut($request, $attendance);
 
-        return back()->with('attendance_success', 'Supervisor attendance updated successfully.');
+        return $this->attendanceResponse($request, 'Supervisor attendance updated successfully.');
     }
 
     public function updateEnforcerTimeOut(
         Request $request,
         EnforcerAttendance $attendance,
-    ): RedirectResponse {
+    ): RedirectResponse|JsonResponse {
         $this->ensureAdmin($request);
         $this->updateTimeOut($request, $attendance);
 
-        return back()->with('attendance_success', 'Enforcer attendance updated successfully.');
+        return $this->attendanceResponse($request, 'Enforcer attendance updated successfully.');
+    }
+
+    public function destroySupervisorAttendance(Request $request, SupervisorAttendance $attendance): RedirectResponse|JsonResponse
+    {
+        $this->ensureAdmin($request);
+        $staff = $attendance->user;
+        $attendance->delete();
+
+        return $this->attendanceResponse($request, 'Attendance record deleted.', $this->historyUrl($request, $staff, false));
+    }
+
+    public function destroyEnforcerAttendance(Request $request, EnforcerAttendance $attendance): RedirectResponse|JsonResponse
+    {
+        $this->ensureAdmin($request);
+        $staff = $attendance->user;
+        DB::transaction(function () use ($attendance): void {
+            $record = EnforcerAttendance::query()->lockForUpdate()->findOrFail($attendance->id);
+            // Model deletion events retain the record in the existing audit trail.
+            $record->delete();
+        });
+        if (! $staff->isOnDuty()) {
+            app(OfficerLocationService::class)->stopSharing($staff);
+        }
+
+        return $this->attendanceResponse($request, 'Attendance record deleted.', $this->historyUrl($request, $staff, true));
+    }
+
+    private function historyUrl(Request $request, User $staff, bool $enforcer): string
+    {
+        $count = $enforcer ? $staff->enforcerAttendances()->count() : $staff->supervisorAttendances()->count();
+        $page = max(1, min($request->integer('page', 1), (int) ceil($count / 20)));
+
+        return route($enforcer ? 'dashboard.attendance.enforcers.show' : 'dashboard.attendance.supervisor', ['user' => $staff, 'page' => $page]);
+    }
+
+    private function attendanceResponse(Request $request, string $message, ?string $redirect = null): RedirectResponse|JsonResponse
+    {
+        $request->session()->flash('attendance_success', $message);
+
+        return $request->expectsJson()
+            ? response()->json(['message' => $message, 'redirect' => $redirect])
+            : ($redirect ? redirect($redirect) : back());
     }
 
     private function updateTimeOut(

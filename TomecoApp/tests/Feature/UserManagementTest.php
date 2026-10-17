@@ -441,7 +441,6 @@ class UserManagementTest extends TestCase
             'role' => User::ROLE_OFFICER,
             'supervisor_id' => $supervisor->id,
             'fullName' => 'Assigned Officer',
-            'barangay' => 'Barangay One',
             'area' => 'Area One',
         ]);
 

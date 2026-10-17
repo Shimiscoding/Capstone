@@ -35,14 +35,15 @@ class ViolationSignatureTest extends TestCase
             ->assertJsonPath('data.enforcer_id', $enforcer->id)
             ->assertJsonPath('data.enforcer_name', $enforcer->fullName)
             ->assertJsonPath('data.enforcer_signature', 'data:image/png;base64,enforcer-signature')
-            ->assertJsonPath('data.evidence_image', 'data:image/jpeg;base64,ZXZpZGVuY2U=')
+            ->assertJsonPath('data.evidence_images.0', 'data:image/jpeg;base64,ZXZpZGVuY2U=')
+            ->assertJsonMissingPath('data.evidence_image')
             ->assertJsonPath('data.signature', 'data:image/png;base64,motorist-signature');
 
         $violation = Violation::firstOrFail();
         $this->assertTrue($violation->enforcer->is($enforcer));
         $this->assertSame('data:image/png;base64,motorist-signature', $violation->signature);
         $this->assertSame('data:image/png;base64,enforcer-signature', $violation->enforcer_signature);
-        $this->assertSame('data:image/jpeg;base64,ZXZpZGVuY2U=', $violation->evidence_image);
+        $this->assertSame(['data:image/jpeg;base64,ZXZpZGVuY2U='], $violation->evidence_images);
         $this->assertNotSame($violation->signature, $violation->getRawOriginal('signature'));
     }
 
@@ -98,7 +99,7 @@ class ViolationSignatureTest extends TestCase
             'vehicle_type' => 'Motorcycle',
             'violation_type' => 'Illegal parking',
             'fine_amount' => 500,
-            'evidence_image' => 'data:image/jpeg;base64,ZXZpZGVuY2U=',
+            'evidence_images' => ['data:image/jpeg;base64,ZXZpZGVuY2U='],
             'signature' => $signature,
             'enforcer_signature' => $enforcerSignature,
         ]);

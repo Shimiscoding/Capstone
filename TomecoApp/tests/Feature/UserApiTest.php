@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 class UserApiTest extends TestCase
@@ -13,11 +14,12 @@ class UserApiTest extends TestCase
     public function test_users_can_be_listed_and_shown(): void
     {
         $user = User::factory()->create(['middleName' => null, 'nameExtension' => null]);
+        Sanctum::actingAs(User::factory()->create(['role' => User::ROLE_ADMIN]));
 
         $this->getJson('/api/users')
             ->assertOk()
             ->assertJsonPath('success', true)
-            ->assertJsonPath('data.0.id', $user->id)
+            ->assertJsonFragment(['id' => $user->id])
             ->assertJsonMissingPath('data.0.password');
 
         $this->getJson("/api/users/{$user->id}")
@@ -30,6 +32,7 @@ class UserApiTest extends TestCase
     public function test_a_user_can_be_updated_and_deleted(): void
     {
         $user = User::factory()->create(['middleName' => null, 'nameExtension' => null]);
+        Sanctum::actingAs(User::factory()->create(['role' => User::ROLE_ADMIN]));
 
         $this->putJson("/api/users/{$user->id}", [
             'firstName' => 'Updated',

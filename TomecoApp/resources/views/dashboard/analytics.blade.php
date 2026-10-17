@@ -28,14 +28,14 @@
         </form>
     </div>
     <div class="analytics-kpi-grid" aria-label="Ticket summary">
-        <article class="analytics-kpi"><span>Total Tickets</span><strong>{{ number_format($summary['total']) }}</strong><small>Issued during {{ $summaryDescription }}</small></article>
+        <article class="analytics-kpi"><span>Total Tickets</span><strong>{{ number_format($summary['total']) }}</strong><small>Issued {{ $summaryDescription }}</small></article>
         <article class="analytics-kpi"><span>Active Enforcers</span><strong>{{ number_format($summary['enforcers']) }}</strong><small>Enforcers who issued tickets in this range</small></article>
         <article class="analytics-kpi"><span>Pending Tickets</span><strong>{{ number_format($summary['pending']) }}</strong><small>Unpaid tickets awaiting resolution</small></article>
         <article class="analytics-kpi"><span>Resolved Tickets</span><strong>{{ number_format($summary['resolved']) }}</strong><small>Paid tickets &middot; {{ $summary['total'] ? round($summary['resolved'] / $summary['total'] * 100, 1) : 0 }}% of this range</small></article>
     </div>
     <div class="analytics-graph-grid">
         <section class="dashboard-panel overall-line-panel analytics-chart-card">
-            <div class="panel-heading"><div><h2 id="analyticsChartTitle">Performance Overview</h2><p>Activity recorded during {{ $periodDescription }}</p></div></div>
+            <div class="panel-heading"><div><h2 id="analyticsChartTitle">Performance Overview</h2><p>Activity recorded {{ $periodDescription }}</p></div></div>
         <div class="analytics-controls">
             <label class="analytics-filter"><span>View</span><select id="analyticsSeriesFilter">
                     <option value="overall">Overall</option>
@@ -79,7 +79,7 @@
         </section>
     </div>
     <section class="analytics-violation-table">
-        <div class="panel-heading"><div><h2>Most Recorded Violations</h2><p>Ranked by issued tickets during {{ $periodDescription }}</p></div><span class="analytics-report-caption">All recorded violation types</span></div>
+        <div class="panel-heading"><div><h2>Most Recorded Violations</h2><p>Ranked by issued tickets {{ $periodDescription }}</p></div><span class="analytics-report-caption">All recorded violation types</span></div>
         <div class="analytics-report-table-scroll" tabindex="0" role="region" aria-label="Violation rankings, scroll horizontally for more columns">
             <table><thead><tr><th scope="col">Violation type</th><th scope="col">Tickets issued</th><th scope="col">Share of tickets</th><th scope="col">Pending</th><th scope="col">Resolved</th></tr></thead><tbody>
                 @forelse ($violationTrends as $violation)

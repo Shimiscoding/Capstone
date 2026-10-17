@@ -11,6 +11,13 @@ use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
+    public function logout(Request $request): JsonResponse
+    {
+        $request->user()->currentAccessToken()?->delete();
+
+        return response()->json(['success' => true, 'message' => 'Logged out successfully.']);
+    }
+
     public function profile(Request $request): JsonResponse
     {
         return response()->json([
@@ -54,8 +61,8 @@ class AuthController extends Controller
 
         // Check whether the account and password are correct.
         if (
-            !$user ||
-            !Hash::check($validated['password'], $user->password)
+            ! $user ||
+            ! Hash::check($validated['password'], $user->password)
         ) {
             throw ValidationException::withMessages([
                 'login' => [
@@ -65,6 +72,9 @@ class AuthController extends Controller
         }
 
         // Mobile access is available to enforcement officers.
+        if (in_array($user->effectiveAccountStatus(), [User::STATUS_INACTIVE, User::STATUS_SUSPENDED, User::STATUS_BANNED], true)) {
+            return response()->json(['success' => false, 'message' => 'This account is '.$user->effectiveAccountStatus().'. Contact an administrator for assistance.'], 403);
+        }
         if ($user->role !== User::ROLE_OFFICER) {
             return response()->json([
                 'success' => false,
@@ -94,6 +104,10 @@ class AuthController extends Controller
     {
         return [
             'id' => $user->id,
+            'username' => $user->username,
+            'address' => $user->address,
+            'area' => $user->area,
+            'supervisor_id' => $user->supervisor_id,
             'fullName' => $user->fullName,
             'firstName' => $user->firstName,
             'middleName' => $user->middleName,
@@ -106,4 +120,3 @@ class AuthController extends Controller
         ];
     }
 }
-    

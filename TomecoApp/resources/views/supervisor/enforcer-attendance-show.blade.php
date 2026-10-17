@@ -3,6 +3,8 @@
 @section('title', $enforcer->fullName . ' Attendance')
 @section('activePage', auth()->user()->isAdmin() ? 'attendance' : 'enforcer-attendance')
 
+@section('workspaceClass', 'workspace-full-width')
+
 @section('content')
     <div class="page-head users-page-head">
         <div>
@@ -20,91 +22,5 @@
         <div class="success-message" role="status">{{ session('attendance_success') }}</div>
     @endif
 
-    <section class="table-card attendance-edit-card">
-        <div class="supervisor-list-heading">
-            <div class="user-cell"><x-user-avatar :user="$enforcer" /><span><strong>{{ $enforcer->fullName }}</strong><small>{{ $enforcer->username ? '@' . $enforcer->username . ' · ' : '' }}{{ $enforcer->email }}</small></span>
-            </div>
-        </div>
-        <div class="table-scroll attendance-edit-table-scroll">
-            <table class="users-table attendance-table">
-                <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Duty</th>
-                        <th>Time In</th>
-                        <th>Time In Location</th>
-                        <th>Time Out</th>
-                        <th>Time Out Location</th>
-                        <th>Total Hours</th>
-                        <th>Status</th>
-                        @if (auth()->user()->isAdmin())
-                            <th>Update Attendance</th>
-                        @endif
-                    </tr>
-                </thead>
-                <tbody>
-                    @forelse($attendances as $attendance)
-                        <tr>
-                            <td>{{ $attendance->attendance_date->format('l, M d, Y') }}</td>
-                            <td>{{ ucfirst($attendance->session) }}</td>
-                            <td>{{ $attendance->time_in?->format('h:i:s A') ?? '—' }}</td>
-                            <td>
-                                @if ($attendance->time_in_latitude !== null && $attendance->time_in_longitude !== null)
-                                    <a href="https://www.google.com/maps?q={{ $attendance->time_in_latitude }},{{ $attendance->time_in_longitude }}"
-                                        target="_blank" rel="noopener noreferrer">Open map</a>
-                                @else
-                                    <span>Unavailable</span>
-                                @endif
-                            </td>
-                            <td>{{ $attendance->time_out?->format('h:i:s A') ?? '—' }}</td>
-                            <td>
-                                @if ($attendance->time_out_latitude !== null && $attendance->time_out_longitude !== null)
-                                    <a href="https://www.google.com/maps?q={{ $attendance->time_out_latitude }},{{ $attendance->time_out_longitude }}"
-                                        target="_blank" rel="noopener noreferrer">Open map</a>
-                                @else
-                                    <span>Unavailable</span>
-                                @endif
-                            </td>
-                            <td>{{ $attendance->time_in && $attendance->time_out ? number_format($attendance->time_in->diffInMinutes($attendance->time_out) / 60, 2) . ' hrs' : '—' }}
-                            </td>
-                            <td><span
-                                    class="attendance-state {{ $attendance->time_out ? 'is-complete' : 'is-active' }}">{{ $attendance->time_out ? 'Completed' : 'Timed in' }}</span>
-                            </td>
-                            @if (auth()->user()->isAdmin())
-                                <td>
-                                    <details class="attendance-edit-menu">
-                                        <summary aria-label="Edit attendance" title="Edit attendance">&#8942;</summary>
-                                        <div class="attendance-edit-dropdown">
-                                            <form class="attendance-time-edit" method="POST"
-                                                action="{{ route('dashboard.attendance.enforcers.time-out', $attendance) }}">
-                                                @csrf
-                                                @method('PUT')
-                                                <label>Time In<input type="time" name="time_in"
-                                                        value="{{ $attendance->time_in?->format('H:i') }}" required></label>
-                                                <label>Time Out<input type="time" name="time_out"
-                                                        value="{{ $attendance->time_out?->format('H:i') }}"
-                                                        min="{{ $attendance->time_in?->format('H:i') }}" required></label>
-                                                <button type="submit">Update Attendance</button>
-                                            </form>
-                                        </div>
-                                    </details>
-                                </td>
-                            @endif
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="{{ auth()->user()->isAdmin() ? 9 : 8 }}" class="empty-state"><strong>No timestamp records</strong><span>This enforcer
-                                    has not recorded attendance yet.</span></td>
-                        </tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
-        @if ($attendances->hasPages())
-            <div class="table-footer"><span>Showing {{ $attendances->firstItem() }}–{{ $attendances->lastItem() }} of
-                    {{ $attendances->total() }}</span>
-                <div class="pagination-actions">{{ $attendances->links() }}</div>
-            </div>
-        @endif
-    </section>
+    <x-attendance-history-table :staff="$enforcer" :attendances="$attendances" :enforcer="true" />
 @endsection

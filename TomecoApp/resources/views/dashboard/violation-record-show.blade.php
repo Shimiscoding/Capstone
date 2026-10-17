@@ -26,7 +26,7 @@
                 ? 'data:image/png;base64,'.preg_replace('/\s+/', '', $value)
                 : null;
         };
-        $signatureSource = $imageSource($signedViolation?->signature);
+        $signatureSource = \App\Support\SignatureImage::source($signedViolation?->signature);
     @endphp
 
     <div class="page-head users-page-head violation-detail-page-head">
@@ -76,7 +76,7 @@
                 <thead><tr><th>Ticket</th><th>Violation</th><th>Plate number</th><th>OR / CR</th><th>Location</th><th>Enforcer</th><th>Date issued</th><th>Fine</th><th>Status</th></tr></thead>
                 <tbody>
                     @foreach ($motoristViolations as $record)
-                        @php($enforcerSignature = $imageSource($record->enforcer?->signature))
+                        @php($enforcerSignature = \App\Support\SignatureImage::source($record->enforcer_signature))
                         <tr>
                             <td><div class="user-cell"><span class="table-avatar">T</span><span><strong>#{{ str_pad((string) $record->id, 7, '0', STR_PAD_LEFT) }}</strong><small>{{ $record->created_at?->format('h:i A') }}</small></span></div></td>
                             <td><strong>{{ $record->violation_type ?: '—' }}</strong></td>

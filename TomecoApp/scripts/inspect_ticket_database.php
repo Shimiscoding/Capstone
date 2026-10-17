@@ -57,9 +57,26 @@ if (in_array('--verify', $argv, true)) {
     }
     foreach ($before['rows'] as $row) {
         $current = (array) $db->table($table)->find($row['id']);
+        $consolidatedEvidence = array_key_exists('evidence_image', $row) && ! array_key_exists('evidence_image', $current);
+        if ($consolidatedEvidence) {
+            $expectedPhotos = isset($row['evidence_images'])
+                ? json_decode(Crypt::decryptString($row['evidence_images']), true, flags: JSON_THROW_ON_ERROR) : [];
+            $legacyPhoto = isset($row['evidence_image']) ? Crypt::decryptString($row['evidence_image']) : null;
+            if (filled($legacyPhoto) && ! in_array($legacyPhoto, $expectedPhotos, true)) {
+                $expectedPhotos[] = $legacyPhoto;
+            }
+            $actualPhotos = isset($current['evidence_images'])
+                ? json_decode(Crypt::decryptString($current['evidence_images']), true, flags: JSON_THROW_ON_ERROR) : [];
+            if ($expectedPhotos !== $actualPhotos) {
+                throw new RuntimeException('Consolidated evidence differs from the backup on ticket '.$row['id']);
+            }
+        }
         foreach ($row as $column => $value) {
             if ($column === 'violation_type') {
                 continue;
+            }
+            if ($consolidatedEvidence && in_array($column, ['evidence_image', 'evidence_images'], true)) {
+                continue; // Compared decrypted photo references above; encryption may change.
             }
             if (! array_key_exists($column, $current) || $current[$column] !== $value) {
                 throw new RuntimeException('A preserved ticket column differs from its backup: '.$column);
@@ -117,5 +134,5 @@ if (in_array('--verify', $argv, true)) {
         'issued_offenses' => $db->table($itemsTable)->count(),
         'form_options' => Schema::hasTable('ticket_violation_items') ? $db->table('violation_issued')->count() : null,
         'catalog_sections' => Schema::hasColumn('violations_type', 'section_id') ? $db->table('violations_type')->count() : $db->table('violations_type')->whereNotNull('section_number')->count(),
-        'preserved' => 'IDs, officer links, timestamps, fines, status, and every encrypted value match the backup.'], JSON_PRETTY_PRINT).PHP_EOL;
+        'preserved' => 'IDs, officer links, timestamps, fines, status, evidence photos, and unaffected encrypted values match the backup.'], JSON_PRETTY_PRINT).PHP_EOL;
 }

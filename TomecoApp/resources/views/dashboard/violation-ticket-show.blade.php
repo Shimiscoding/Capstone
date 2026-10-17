@@ -13,9 +13,14 @@
         if (preg_match('/^data:image\/(?:png|jpe?g|webp);base64,[A-Za-z0-9+\/=\s]+$/i', $value)) return preg_replace('/\s+/', '', $value);
         return preg_match('/^[A-Za-z0-9+\/=\s]+$/', $value) ? 'data:image/jpeg;base64,'.preg_replace('/\s+/', '', $value) : null;
     };
-    $evidenceSource = $imageSource($violation->evidence_image);
-    $motoristSignatureSource = $imageSource($violation->signature);
-    $enforcerSignatureSource = $imageSource($violation->enforcer_signature ?: $violation->enforcer?->signature);
+    $evidenceSources = [];
+    foreach ($violation->evidence_photos as $index => $photo) {
+        $source = str_starts_with($photo, \App\Services\TicketEvidence::PREFIX)
+            ? route('tickets.evidence', [$violation, $index]) : $imageSource($photo);
+        if ($source) $evidenceSources[] = $source;
+    }
+    $motoristSignatureSource = \App\Support\SignatureImage::source($violation->signature);
+    $enforcerSignatureSource = \App\Support\SignatureImage::source($violation->enforcer_signature);
 @endphp
 
 <header class="page-head violation-detail-page-head">
@@ -24,23 +29,31 @@
 </header>
 
 <div class="violation-detail-layout">
-    <main class="violation-detail-main">
+    <div class="violation-detail-main">
         <section class="violation-detail-card"><header class="violation-detail-section-head"><h2>Driver and permit</h2></header><dl class="violation-detail-list">
             <div><dt>Full name</dt><dd>{{ $violation->full_name ?: 'Not recorded' }}</dd></div><div><dt>D/L permit number</dt><dd>{{ $violation->license_number ?: 'Not recorded' }}</dd></div>
             <div><dt>First name</dt><dd>{{ $violation->first_name ?: '—' }}</dd></div><div><dt>Middle name</dt><dd>{{ $violation->middle_name ?: '—' }}</dd></div>
             <div><dt>Last name</dt><dd>{{ $violation->last_name ?: '—' }}</dd></div><div><dt>Permit type</dt><dd>{{ $permitType }}</dd></div>
         </dl></section>
         <section class="violation-detail-card"><header class="violation-detail-section-head"><h2>Vehicle documents</h2></header><dl class="violation-detail-list">
-            <div><dt>Plate number</dt><dd>{{ $violation->plate_number ?: 'Not recorded' }}</dd></div><div><dt>Vehicle type</dt><dd>{{ $violation->vehicle_type ?: 'Not recorded' }}</dd></div>
+            <div><dt>Observed plate</dt><dd>{{ $violation->plate_number ?: 'Not recorded' }}</dd></div><div><dt>Document plate</dt><dd>{{ $violation->registration_plate_number ?: 'Not recorded' }}</dd></div>
+            <div><dt>Vehicle description</dt><dd>{{ $violation->vehicle_type ?: 'Not recorded' }}</dd></div><div><dt>Make</dt><dd>{{ $violation->vehicle_make ?: 'Not recorded' }}</dd></div>
+            <div><dt>Model / series</dt><dd>{{ $violation->vehicle_series ?: 'Not recorded' }}</dd></div><div><dt>Body type</dt><dd>{{ $violation->vehicle_body_type ?: 'Not recorded' }}</dd></div>
+            <div><dt>Year model</dt><dd>{{ $violation->vehicle_year_model ?: 'Not recorded' }}</dd></div>
             <div><dt>Official receipt (OR)</dt><dd>{{ $violation->or_number ?: 'Not recorded' }}</dd></div><div><dt>Certificate of registration (CR)</dt><dd>{{ $violation->cr_number ?: 'Not recorded' }}</dd></div>
         </dl></section>
-        <section class="violation-detail-card"><header class="violation-detail-section-head"><h2>Evidence image</h2><span class="record-state {{ $evidenceSource ? 'is-recorded' : 'is-missing' }}">{{ $evidenceSource ? 'Recorded' : 'Not recorded' }}</span></header>@if($evidenceSource)<figure class="violation-evidence-image"><img src="{{ $evidenceSource }}" alt="Evidence for violation ticket {{ $ticketNumber }}"><figcaption>Evidence submitted with this citation</figcaption></figure>@else<div class="record-empty">No evidence image was submitted for this ticket.</div>@endif</section>
+        <section class="violation-detail-card"><header class="violation-detail-section-head"><h2>Registered owner</h2></header><dl class="violation-detail-list">
+            <div><dt>Owner name</dt><dd>{{ $violation->registered_owner_name ?: 'Not recorded' }}</dd></div><div><dt>Owner address</dt><dd>{{ $violation->registered_owner_address ?: 'Not recorded' }}</dd></div>
+        </dl></section>
+        <section class="violation-detail-card"><header class="violation-detail-section-head"><h2>Evidence images</h2><span class="record-state {{ $evidenceSources ? 'is-recorded' : 'is-missing' }}">{{ $evidenceSources ? count($evidenceSources).' recorded' : 'Not recorded' }}</span></header>
+            @forelse($evidenceSources as $index => $source)<figure class="violation-evidence-image"><img src="{{ $source }}" alt="Evidence photo {{ $index + 1 }} for violation ticket {{ $ticketNumber }}"><figcaption>Evidence photo {{ $index + 1 }} of {{ count($evidenceSources) }}</figcaption></figure>@empty<div class="record-empty">No evidence image was submitted for this ticket.</div>@endforelse
+        </section>
         <section class="violation-signatures-grid" aria-label="Ticket signatures">
             @foreach ([['Driver signature', $motoristSignatureSource, $violation->full_name ?: 'Driver'], ['Enforcer signature', $enforcerSignatureSource, $violation->enforcer_name ?: 'Enforcer']] as [$label, $source, $name])
                 <article class="violation-detail-card signature-record"><header class="violation-detail-section-head"><h2>{{ $label }}</h2><span class="record-state {{ $source ? 'is-recorded' : 'is-missing' }}">{{ $source ? 'Recorded' : 'Not recorded' }}</span></header><div class="signature-record-body">@if($source)<img src="{{ $source }}" alt="{{ $name }} signature"><p>{{ $name }} · Captured for ticket {{ $ticketNumber }}</p>@else<div class="record-empty">No signature was captured.</div>@endif</div></article>
             @endforeach
         </section>
-    </main>
+    </div>
     <aside class="violation-detail-card violation-citation-card"><header class="violation-detail-section-head"><h2>Citation summary</h2><span class="status-badge {{ $violation->status === 'paid' ? '' : 'status-pending' }}"><i></i>{{ ucfirst($violation->status ?: 'unpaid') }}</span></header><dl class="violation-detail-list">
         <div><dt>Cited violations</dt><dd>
             @forelse ($violation->issuedViolations as $offense)
@@ -51,7 +64,7 @@
                 @endphp
                 <p><strong>{{ $offense->formOption->label }}</strong><br>
                     @if ($showDescription){{ $offense->description_snapshot }}<br>@endif
-                    <small>{{ $offense->type ? 'Sec. '.$offense->type->section_id : 'Section not recorded' }}</small>
+                    @if ($offense->type)<small>Sec. {{ $offense->type->section_id }}</small>@endif
                     @if ($offense->remarks)<br><small>{{ $offense->remarks }}</small>@endif
                 </p>
             @empty

@@ -26,6 +26,17 @@ It is not a per-section rate. In particular, a historical ticket with five check
 offenses does not justify inventing five separate fine amounts. Fine suggestions in
 the existing Settings screen remain configuration, not statutory catalog rates.
 
+Evidence has one stored field: `Ticket_issued.evidence_images`, an encrypted ordered
+array supporting both single-photo and multi-photo tickets. New Android requests send
+only multipart `evidence_images[]` (1–5 images). The API still accepts the older
+singular request key as an input alias, normalizing it before saving; responses and
+the database no longer contain `evidence_image`. Migration
+`2026_10_15_000100_consolidate_ticket_evidence` moves legacy-only photos into the
+collection, preserves existing order, avoids repeating a shared first-photo reference,
+and retains any distinct legacy photo before dropping the redundant column. It stops
+on unreadable encrypted evidence before dropping anything. Rollback restores a
+first-photo column without discarding the collection.
+
 Each ticket/form-option/section pair is unique, including form-only selections.
 An indexed generated `section_key` treats a null section as zero for uniqueness;
 it is not entered by the client. Ticket deletion cascades to its cited rows; a type
@@ -114,6 +125,8 @@ layout; it refuses a rollback if multiple form options for one section would be 
 
 The simplification migration replaces old catalog IDs with actual section numbers and preserves all ticket snapshots. Clients must refresh their section catalog: `violations_type_id` now refers to `section_id`. Catalog keys, ordinance codes, active flags, and timestamps are removed from the section table. The encrypted backup retains the old metadata.
 
-Approved section grouping: Driving without D/L (20, 21); Unregistered Vehicle (19); Illegal parking (7, 50); Disregarding Traffic Sign (38, 42, 43, 44); Obstruction (16, 48, 49, 71); Defective Head Light (5). Remaining supplied sections belong to Others. Sec. 5 is assigned to Defective Head Light by the user despite covering other accessories. Existing ticket selections stay unchanged, so catalog regrouping does not rewrite historical analytics.
+Description-based section grouping: Driving without D/L (20); Unregistered Vehicle (19); Illegal parking (7, 50); Disregarding Traffic Sign (38, 42, 43, 44); Obstruction (16, 48, 49, 71). The remaining 61 supplied sections belong to Others. The accuracy review supersedes the earlier broad assignments for sections 5 and 21: section 5 includes non-headlight accessories, and section 21 concerns failure to carry a license, unlike section 20 (failure to secure one). Both now belong to Others. Existing ticket selections stay unchanged, so catalog regrouping does not rewrite historical analytics. The correction changes only the original supplied entries under their previous groups; locally edited descriptions and custom group mappings remain untouched.
+
+The 13 printed options are retained, including those without matching sections. These mappings are conservative interpretations of the supplied text, not an officially verified ordinance crosswalk. See [the grouping audit](docs/violation-group-audit.md) for the full review and missing references. Mobile clients must refresh cached catalog data after regrouping; the structured ticket API rejects old mismatched pairs.
 
 Form options no longer have an active flag: every stored option is selectable.

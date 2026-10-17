@@ -17,26 +17,82 @@ class NormalizedTicketTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_approved_section_groups_support_headlight_and_license_citations(): void
+    public function test_section_groups_preserve_the_full_meaning_of_the_supplied_descriptions(): void
     {
         $this->signInOfficer();
-        foreach ([5 => 'Defective Head Light', 21 => 'Driving without D/L', 50 => 'Illegal parking',
+        foreach ([5 => 'Others', 20 => 'Driving without D/L', 21 => 'Others', 50 => 'Illegal parking',
             48 => 'Obstruction', 49 => 'Obstruction', 71 => 'Obstruction', 54 => 'Others', 70 => 'Others'] as $section => $label) {
             $this->assertSame($label, ViolationType::findOrFail($section)->formOption->label);
         }
         $this->postJson('/api/violations', $this->payload([
-            ['violations_type_id' => 5], ['violations_type_id' => 21],
+            ['violations_type_id' => 5], ['violations_type_id' => 20],
         ]))->assertCreated();
         $ticket = Violation::firstOrFail();
         $before = DB::table('ticket_violation_items')->where('ticket_issued_id', $ticket->id)->get()->toArray();
-        $migration = require database_path('migrations/2026_10_12_000000_group_violation_sections.php');
+        $migration = require database_path('migrations/2026_10_15_000000_correct_ambiguous_violation_groups.php');
         $migration->down();
         $migration->up();
         $this->assertEquals($before, DB::table('ticket_violation_items')->where('ticket_issued_id', $ticket->id)->get()->toArray());
         $this->actingAs(User::factory()->create(['role' => User::ROLE_ADMIN]))
             ->get(route('dashboard.analytics'))->assertOk()
-            ->assertViewHas('violationTrends', fn ($rows) => $rows->firstWhere('violation_type', 'Defective Head Light')->total == 1
+            ->assertViewHas('violationTrends', fn ($rows) => $rows->firstWhere('violation_type', 'Others')->total == 1
                 && $rows->firstWhere('violation_type', 'Driving without D/L')->total == 1);
+    }
+
+    public function test_corrected_groups_are_returned_by_the_api_and_old_pairs_are_rejected(): void
+    {
+        $this->signInOfficer();
+        $license = ViolationIssued::where('label', 'Driving without D/L')->firstOrFail();
+        $headlight = ViolationIssued::where('label', 'Defective Head Light')->firstOrFail();
+        $others = ViolationIssued::where('label', 'Others')->firstOrFail();
+        $this->getJson('/api/violation-types?form_group=Driving%20without%20D%2FL')
+            ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.section_id', 20);
+        $this->getJson('/api/violation-types?form_group=Defective%20Head%20Light')
+            ->assertOk()->assertJsonCount(0, 'data');
+        $this->getJson('/api/violation-types?form_group=Others')
+            ->assertOk()->assertJsonCount(61, 'data')->assertJsonPath('meta.total', 61);
+        foreach ([5 => $headlight->id, 21 => $license->id] as $section => $oldGroup) {
+            $this->postJson('/api/violations', $this->payload([
+                ['violation_issued_id' => $oldGroup, 'violations_type_id' => $section],
+            ]))->assertUnprocessable();
+        }
+        $this->assertDatabaseCount('Ticket_issued', 0);
+        $this->postJson('/api/violations', $this->payload([
+            ['violation_issued_id' => $others->id, 'violations_type_id' => 5],
+            ['violation_issued_id' => $others->id, 'violations_type_id' => 21],
+        ]))->assertCreated()->assertJsonCount(2, 'data.issued_violations');
+    }
+
+    public function test_group_correction_preserves_historical_citations_and_custom_catalog_entries(): void
+    {
+        $this->signInOfficer();
+        $migration = require database_path('migrations/2026_10_15_000000_correct_ambiguous_violation_groups.php');
+        $migration->down();
+        $this->postJson('/api/violations', $this->payload([
+            ['violations_type_id' => 5], ['violations_type_id' => 21],
+        ]))->assertCreated();
+        $ticketBefore = DB::table('Ticket_issued')->first();
+        $itemsBefore = DB::table('ticket_violation_items')->orderBy('id')->get()->toArray();
+        $typesBefore = DB::table('violations_type')->orderBy('section_id')->pluck('description', 'section_id')->all();
+        $optionsBefore = DB::table('violation_issued')->orderBy('id')->get()->toArray();
+        $migration->up();
+        $migration->up(); // Re-running the correction is harmless.
+        $this->assertEquals($ticketBefore, DB::table('Ticket_issued')->first());
+        $this->assertEquals($itemsBefore, DB::table('ticket_violation_items')->orderBy('id')->get()->toArray());
+        $this->assertSame($typesBefore, DB::table('violations_type')->orderBy('section_id')->pluck('description', 'section_id')->all());
+        $this->assertEquals($optionsBefore, DB::table('violation_issued')->orderBy('id')->get()->toArray());
+        $this->assertSame('Others', ViolationType::findOrFail(5)->formOption->label);
+        $this->assertSame('Others', ViolationType::findOrFail(21)->formOption->label);
+
+        $migration->down();
+        $this->assertSame('Defective Head Light', ViolationType::findOrFail(5)->formOption->label);
+        $this->assertSame('Driving without D/L', ViolationType::findOrFail(21)->formOption->label);
+        ViolationType::findOrFail(5)->update(['description' => 'Locally maintained headlight-only entry']);
+        $customGroup = ViolationIssued::where('label', 'Obstruction')->firstOrFail();
+        ViolationType::findOrFail(21)->update(['violation_issued_id' => $customGroup->id]);
+        $migration->up();
+        $this->assertSame('Defective Head Light', ViolationType::findOrFail(5)->formOption->label);
+        $this->assertSame($customGroup->id, ViolationType::findOrFail(21)->formOption->id);
     }
 
     private function payload(array $offenses): array
@@ -211,7 +267,7 @@ class NormalizedTicketTest extends TestCase
         $this->assertDatabaseCount('violation_issued', 13);
         $this->actingAs(User::factory()->create(['role' => User::ROLE_ADMIN]))
             ->get(route('dashboard.violation-records.show', Violation::firstOrFail()))
-            ->assertOk()->assertSeeText('No helmet')->assertSeeText('Section not recorded')->assertSeeText('Sec. 43');
+            ->assertOk()->assertSeeText('No helmet')->assertDontSeeText('Section not recorded')->assertSeeText('Sec. 43');
     }
 
     public function test_form_only_duplicates_invalid_options_and_undescribed_others_are_rejected(): void

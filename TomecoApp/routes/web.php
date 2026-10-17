@@ -12,6 +12,8 @@ use App\Http\Controllers\ProfilePhotoController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\SupervisorAttendanceController;
 use App\Http\Controllers\SupervisorTeamController;
+use App\Http\Controllers\TicketEvidenceController;
+use App\Http\Middleware\EnsureApiAccountActive;
 use App\Http\Middleware\EnsureUserCanAccessWebsite;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
@@ -32,6 +34,8 @@ Route::middleware('guest')->controller(AuthController::class)->group(function ()
 });
 
 Route::get('/users/{user}/profile-photo', [ProfilePhotoController::class, 'show'])->middleware('auth:sanctum')->name('users.profile-photo');
+Route::get('/tickets/{violation}/evidence/{index}', [TicketEvidenceController::class, 'show'])
+    ->whereNumber('index')->middleware(['auth:sanctum', EnsureApiAccountActive::class])->name('tickets.evidence');
 
 Route::middleware('auth')->group(function (): void {
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
@@ -92,6 +96,8 @@ Route::middleware('auth')->group(function (): void {
             Route::get('/{user}', [DashboardController::class, 'supervisorAttendance'])->name('dashboard.attendance.supervisor');
             Route::put('/supervisors/{attendance}/time-out', [AdminAttendanceController::class, 'updateSupervisorTimeOut'])->name('dashboard.attendance.supervisors.time-out');
             Route::put('/enforcers/{attendance}/time-out', [AdminAttendanceController::class, 'updateEnforcerTimeOut'])->name('dashboard.attendance.enforcers.time-out');
+            Route::delete('/supervisors/{attendance}', [AdminAttendanceController::class, 'destroySupervisorAttendance'])->name('dashboard.attendance.supervisors.destroy');
+            Route::delete('/enforcers/{attendance}', [AdminAttendanceController::class, 'destroyEnforcerAttendance'])->name('dashboard.attendance.enforcers.destroy');
         });
 
         /* Admin user and team-assignment management. */

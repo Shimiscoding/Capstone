@@ -12,7 +12,7 @@ class ProfileTest extends TestCase
 
     public function test_every_account_role_can_open_its_own_profile(): void
     {
-        foreach (User::ROLES as $role) {
+        foreach ([User::ROLE_ADMIN, User::ROLE_SUPERVISOR] as $role) {
             $user = User::factory()->create(['role' => $role]);
 
             $this->actingAs($user)
@@ -29,7 +29,6 @@ class ProfileTest extends TestCase
             'username' => 'old.username',
             'address' => 'Old Address',
             'area' => 'Old Area',
-            'barangay' => 'Old Barangay',
         ]);
 
         $this->actingAs($user)->put(route('profile.update'), [

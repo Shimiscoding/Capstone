@@ -32,13 +32,20 @@ class Violation extends Model
         'license_type',
         'plate_number',
         'vehicle_type',
+        'registration_plate_number',
+        'vehicle_make',
+        'vehicle_series',
+        'vehicle_body_type',
+        'vehicle_year_model',
+        'registered_owner_name',
+        'registered_owner_address',
+        'evidence_images',
         'or_number',
         'cr_number',
         'violation_type',
         'fine_amount',
         'status',
         'location',
-        'evidence_image',
         'signature',
         'enforcer_signature',
         'motorist_key',
@@ -52,10 +59,17 @@ class Violation extends Model
             'last_name' => 'encrypted',
             'license_number' => 'encrypted',
             'plate_number' => 'encrypted',
+            'registration_plate_number' => 'encrypted',
+            'vehicle_make' => 'encrypted',
+            'vehicle_series' => 'encrypted',
+            'vehicle_body_type' => 'encrypted',
+            'vehicle_year_model' => 'encrypted',
+            'registered_owner_name' => 'encrypted',
+            'registered_owner_address' => 'encrypted',
+            'evidence_images' => 'encrypted:array',
             'or_number' => 'encrypted',
             'cr_number' => 'encrypted',
             'location' => 'encrypted',
-            'evidence_image' => 'encrypted',
             'signature' => 'encrypted',
             'enforcer_signature' => 'encrypted',
         ];
@@ -90,6 +104,11 @@ class Violation extends Model
     public function enforcer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'enforcer_id');
+    }
+
+    public function getEvidencePhotosAttribute(): array
+    {
+        return $this->evidence_images ?: [];
     }
 
     public function issuedViolations(): HasMany

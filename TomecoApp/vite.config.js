@@ -12,13 +12,13 @@ export default defineConfig({
     ],
     server: {
         host: '0.0.0.0',
-        origin: 'http://10.162.60.83:5173',
+        origin: 'http://10.113.181.83:5173',
         hmr: {
-            host: '10.162.60.83',
+            host: '10.113.181.83',
             port: 5173,
         },
         cors: {
-            origin: 'http://10.162.60.83:8000',
+            origin: 'http://10.113.181.83:8000',
         },
         watch: {
             ignored: ['**/storage/framework/views/**'],
