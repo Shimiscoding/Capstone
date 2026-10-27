@@ -22,10 +22,13 @@ class User extends Authenticatable
 
     public const ROLE_SUPERVISOR = 'supervisor';
 
+    public const ROLE_CASHIER = 'cashier';
+
     public const ROLES = [
         self::ROLE_ADMIN,
         self::ROLE_OFFICER,
         self::ROLE_SUPERVISOR,
+        self::ROLE_CASHIER,
     ];
 
     public const STATUS_ACTIVE = 'active';
@@ -135,6 +138,11 @@ class User extends Authenticatable
     public function isSupervisor(): bool
     {
         return $this->role === self::ROLE_SUPERVISOR;
+    }
+
+    public function isCashier(): bool
+    {
+        return $this->role === self::ROLE_CASHIER;
     }
 
     public function effectiveAccountStatus(): string

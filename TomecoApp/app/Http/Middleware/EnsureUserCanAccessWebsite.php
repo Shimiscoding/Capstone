@@ -13,6 +13,10 @@ class EnsureUserCanAccessWebsite
     {
         abort_if($request->user()?->role === User::ROLE_OFFICER, 403, 'Enforcer accounts are available only in the mobile app.');
 
+        if ($request->user()?->isCashier() && ! $request->routeIs('dashboard', 'cashier.dashboard')) {
+            return response()->view('cashier.forbidden', [], 403);
+        }
+
         return $next($request);
     }
 }

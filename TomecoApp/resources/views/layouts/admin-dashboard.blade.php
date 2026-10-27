@@ -39,6 +39,8 @@
 
             @hasSection('headerSearch')
                 @yield('headerSearch')
+            @elseif ($user->isCashier())
+                <span class="section-label">Cashier workspace</span>
             @else
                 <div class="search">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -50,15 +52,19 @@
             @endif
 
             <div class="topbar-spacer"></div>
-            @include('dashboard.partials.notifications')
+            @unless ($user->isCashier())
+                @include('dashboard.partials.notifications')
+            @endunless
             <div class="profile-menu" id="profileMenu">
                 <button class="profile" id="profileMenuToggle" type="button" aria-label="Open account menu"
                     aria-haspopup="menu" aria-expanded="false"><x-user-avatar :user="$user" class="header-profile-avatar" /></button>
                 <div class="profile-dropdown" id="profileDropdown" role="menu" hidden>
                     <div class="profile-dropdown-user">
                         <strong>{{ $user->fullName ?: 'User' }}</strong><small>{{ $user->email }}</small></div>
-                    <a href="{{ route('profile.edit') }}" role="menuitem"><span>My Profile</span></a>
-                    <form method="POST" action="{{ route('logout') }}">@csrf<button type="submit" role="menuitem">Sign
+                    @unless ($user->isCashier())
+                        <a href="{{ route('profile.edit') }}" role="menuitem"><span>My Profile</span></a>
+                    @endunless
+                    <form method="POST" action="{{ route('logout') }}" novalidate>@csrf<button type="submit" role="menuitem">Sign
                             out</button></form>
                 </div>
             </div>
@@ -66,6 +72,15 @@
 
         <aside class="sidebar" id="dashboardSidebar" aria-label="Main navigation">
             <div class="sidebar-scroll">
+                @if ($user->isCashier())
+                    <nav class="nav-section" aria-label="Cashier">
+                        <p class="section-label">Cashier</p>
+                        <a class="nav-item {{ $activePage === 'cashier' ? 'is-active' : '' }}" href="{{ route('cashier.dashboard') }}" @if ($activePage === 'cashier') aria-current="page" @endif>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M7 3h10l2 2v16l-3-2-4 2-4-2-3 2V5Z" /><path d="M9 8h6M9 12h6M9 16h4" /></svg>
+                            <span class="nav-text">Ticket overview</span>
+                        </a>
+                    </nav>
+                @else
                 <nav class="nav-section">
                     <p class="section-label">Operations</p>
                     <a class="nav-item {{ $activePage === 'dashboard' ? 'is-active' : '' }}" href="{{ route('dashboard') }}">
@@ -119,7 +134,9 @@
                         <span class="nav-text">Audit Log</span>
                     </a>
                 </nav>
+                @endif
             </div>
+            @unless ($user->isCashier())
             <div class="sidebar-footer">
                 <a class="nav-item {{ $activePage === 'profile' ? 'is-active' : '' }}" href="{{ route('profile.edit') }}">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></svg>
@@ -130,6 +147,7 @@
                     <span class="nav-text">Settings</span>
                 </a>
             </div>
+            @endunless
         </aside>
 
         <main class="content">

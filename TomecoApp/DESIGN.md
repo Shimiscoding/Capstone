@@ -65,6 +65,15 @@ The shared shell and tokens remain owned by `public/css/dashboard.css`; `public/
 
 ## Do's and Don'ts
 
+The cashier overview reuses the shared dashboard shell, `.users-table`, status
+badges, and pagination. It is a read-only variant with a single Ticket overview
+navigation item and no Actions column. Ticket IDs remain the red record anchor
+but are plain text because this role has no ticket-detail access. Full motorist,
+plate, and violation values wrap; the table owns horizontal overflow on narrow
+screens. `public/css/cashier-dashboard.css` owns only this variant's geometry
+and consumes `--panel`, `--soft`, `--line`, `--text`, `--muted`, and `--accent`
+from the canonical `public/css/dashboard.css` palette without changing tokens.
+
 Do preserve exact record values and readable status text. Do not hide primary actions behind row-wide click handlers or use modals for complete tickets.
 
 Analytics uses one URL-backed range control (Today, Week, Month, Year, All) for cards, chart, vehicle trends, and violation rankings. Today uses Manila midnight, Week starts Monday, Month and Year start at calendar boundaries; ranges end at the current time. The chart has no separate Period selector. Existing View and Chart type selections persist across range changes.
@@ -78,3 +87,5 @@ Staff profile views for enforcers, supervisors, and admins reuse the create/edit
 Area Assignment uses a stable full-width search field with an explicit clear button, an area filter, and a primary Add area action. The compact table uses bounded assignment dropdowns, quieter area badges, and accessible per-enforcer save buttons. Native select behavior and existing assignment permissions remain unchanged.
 
 Attendance history reuses `components.attendance-history-table` for enforcers and supervisors. Date and weekday share a cell; map links sit beneath their matching timestamps. The table scrolls inside its card on narrow screens. Admins have visible Edit and Delete buttons in one Actions column, opening the shared attendance dialogs outside the scroll region. Dialogs reuse the attendance restriction surface and footer styles.
+
+Location Monitoring uses the approved Map First layout: a full-width map beneath a compact status strip, a floating collapsible officer roster, and a non-modal selected-officer card at the lower right. Narrow screens collapse the roster when selecting an officer and restore it on closing details. Team, area, and status filters remain native selects with platform-owned popups. `public/css/location-monitoring.css` owns only this layout and consumes the canonical dashboard `--bg`, `--panel`, `--text`, `--muted`, `--line`, `--line-strong`, `--active`, and `--accent` tokens. The runtime palette remains owned by `public/css/dashboard.css`; no global palette change is introduced. Officer photos and initials reuse `.location-avatar`. Map controls remain owned by Google Maps. Location age and GPS accuracy have separate labels; off-duty and offline counts remain distinct.

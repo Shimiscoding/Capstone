@@ -197,8 +197,12 @@ class DashboardController extends Controller
     |--------------------------------------------------------------------------
     */
 
-    public function index(Request $request): View
+    public function index(Request $request): View|RedirectResponse
     {
+        if ($request->user()->isCashier()) {
+            return redirect()->route('cashier.dashboard');
+        }
+
         if ($request->user()->isSupervisor()) {
             $supervisor = $request->user()->load(['enforcers' => fn ($query) => $query
                 ->where('role', User::ROLE_OFFICER)

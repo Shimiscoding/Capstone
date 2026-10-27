@@ -1,4 +1,9 @@
 :root {
+      --scrollbar-thumb: #cbd5e1;
+      --scrollbar-track: #f8fafc;
+      --scrollbar-hover: #94a3b8;
+      --scrollbar-active: #64748b;
+      scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
       --bg: #f8fafc;
       --panel: #ffffff;
       --line: #e2e8f0;
@@ -16,6 +21,17 @@
 
     * {
       box-sizing: border-box;
+      scrollbar-width: thin;
+    }
+
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-track { background: var(--scrollbar-track); }
+    ::-webkit-scrollbar-thumb { border: 2px solid var(--scrollbar-track); border-radius: 8px; background: var(--scrollbar-thumb); }
+    ::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-hover); }
+    ::-webkit-scrollbar-thumb:active { background: var(--scrollbar-active); }
+    @media (forced-colors: active) {
+      :root { scrollbar-color: auto; }
+      * { scrollbar-width: auto; }
     }
 
     body {
@@ -1122,6 +1138,10 @@
       height: 6px;
       border-radius: 50%;
       background: #10b981;
+    }
+
+    .status-badge.status-pending i {
+      background: var(--yellow);
     }
 
     .empty-state {

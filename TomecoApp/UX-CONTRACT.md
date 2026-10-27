@@ -13,12 +13,32 @@
 
 ## Canonical UI ownership
 
-| Capability | Owner | Behavior |
-|---|---|---|
-| Data table | `.users-table` with violation variants | Semantic table, internal horizontal overflow, server pagination |
-| Actions menu | `.record-actions` | Native details/summary with one navigational action |
-| Record detail | `dashboard.violation-ticket-show` | Dedicated page with URL and honest document title |
-| Scrollbar | `public/css/dashboard.css` | Global application styling |
+| Capability | Canonical owner | Source of truth | Allowed variants | Verification |
+|---|---|---|---|---|
+| Data table | `.users-table` | This contract and `DESIGN.md` | Violation records; cashier read-only overview | Feature tests and desktop/narrow browser inspection |
+| Actions menu | `.record-actions` | This contract | Native details/summary with one navigational action | Ticket navigation checks |
+| Record detail | `dashboard.violation-ticket-show` | Ticket domain contract | Dedicated page with URL and honest document title | ViolationRecordsPageTest |
+| Scrollbar | `public/css/dashboard.css` | `DESIGN.md` runtime token ownership | Global application styling | Computed browser style |
+| Select/Listbox | Native HTML select | This contract | Platform-owned popup accepted for monitoring filters | Keyboard and popup inspection |
+
+## Cashier overview
+
+The first cashier version is a website-only, read-only overview: Ticket overview
+and Sign out are its available navigation actions. `/dashboard` sends cashiers
+to `/dashboard/cashier`. The overview uses real ticket records, server pagination
+of 15 rows, deterministic newest-first ordering, PHP currency, recorded status
+text, and Asia/Manila timestamps. It has no Actions column or links to driver
+history, complete tickets, payments, or administration. Empty results explain
+when records appear; an out-of-range page redirects to the last valid page.
+
+The shared website middleware allows cashiers only the dashboard landing and
+cashier overview routes; other website pages return 403 with a return link.
+Logout remains available through the shared authenticated logout route. The
+authenticated API middleware denies cashier access, including mutations.
+Sources: the user-approved cashier overview scope, `EnsureUserCanAccessWebsite`,
+`EnsureApiAccountActive`, and `CashierDashboardController`. Coverage:
+`tests/Feature/CashierDashboardTest.php`. Local sample-account creation follows
+`docs/cashier-dashboard.md`; it does not create tickets or reset existing users.
 
 ## Data integrity
 
@@ -51,6 +71,8 @@ Violation rankings display every recorded form-option group in the selected anal
 Only enforcers can receive operational areas. Admins assign any enforcer; supervisors assign their own team. User creation/editing and profile editing cannot change areas. Area Assignment is the sole website workflow for those changes.
 
 Profile photos: admins upload in user creation/editing; users upload in their profile or the authenticated self-service API. JPG/PNG/WebP only, max 2 MB, dimensions 32–4096 px. Private photo delivery permits self, admins, and the assigned supervisor. Staff tables, location list/popups, and map markers share photos with initials/status fallback. Replacing/removing a photo deletes the previous file; photo URLs change on replacement.
+
+Location Monitoring reuses `location-monitoring.index` and `resources/js/location-monitoring.js` for admin and supervisor roles. Permissions and duty-based location sharing follow `docs/officer-location-monitoring.md`, `LocationMonitoringController`, and `OfficerLocationService`. The floating roster is a non-modal disclosure with `aria-expanded`; the selected-officer card is non-modal and has Close and Escape recovery. Selection remains available when the map is unavailable. Mobile selection collapses the roster; closing details restores the roster and selected-row focus. Filtered-out selections close. Search has explicit clear and IME-safe local filtering. Monitoring searches and filters remain transient in page memory, since names/personnel queries belong to a live operational session rather than browser history. A failed refresh preserves received locations with a persistent stale-data notice and Refresh recovery. Map failure does not hide officer data. Live connection status reflects the transport only; location freshness and low GPS accuracy are separately labeled. Off duty never counts as offline. All roster positions are the latest reported position, not a guarantee of current presence. Time-in details use Asia/Manila.
 
 My Profile uses a compact identity card with a round photo, calm personal-information and password cards, and a read-only account sidebar. The shared photo editor provides a preview, upload/change/remove buttons, and pending-save feedback. Existing account settings and permissions remain unchanged.
 

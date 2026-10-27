@@ -4,6 +4,7 @@ use App\Http\Controllers\AdminAttendanceController;
 use App\Http\Controllers\AreaAssignmentController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CashierDashboardController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EnforcerAttendanceController;
 use App\Http\Controllers\LocationMonitoringController;
@@ -47,6 +48,7 @@ Route::middleware('auth')->group(function (): void {
             Route::put('/', 'update')->name('update');
         });
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+        Route::get('/dashboard/cashier', [CashierDashboardController::class, 'index'])->name('cashier.dashboard');
         Route::get('/dashboard/audit-logs', [AuditLogController::class, 'index'])->name('dashboard.audit-logs');
         Route::controller(DashboardController::class)->prefix('dashboard')->name('dashboard.')->group(function (): void {
             Route::get('/analytics', 'analytics')->name('analytics');

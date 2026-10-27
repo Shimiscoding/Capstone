@@ -12,12 +12,16 @@ if (root) {
     const subscriptions = new Set();
     let authorizedTeamIds = [];
     let map;
-    let infoWindow;
     let selectedId = null;
     let serverOffset = 0;
     let hasFittedBounds = false;
+    let locationRequest;
+    let requestVersion = 0;
+    let hasLoaded = false;
+    let rosterCollapsed = false;
+    let lastListMarkup = '';
 
-    const elements = Object.fromEntries(['liveConnection','summaryOnDuty','summaryOffline','summaryTeams','summaryAlerts','officerSearch','teamFilter','statusFilter','areaFilter','refreshLocations','fitAllLocations','officerList','officerCount','mapStatus'].map(id => [id, document.getElementById(id)]));
+    const elements = Object.fromEntries(['liveConnection','summaryOnDuty','summaryOffline','summaryOffDuty','summaryTeams','summaryAlerts','officerSearch','clearOfficerSearch','teamFilter','statusFilter','areaFilter','refreshLocations','fitAllLocations','officerList','officerCount','mapStatus','toggleOfficerPanel','officerPanelBody','selectedOfficer','selectedOfficerContent','closeOfficerDetails','locationDataStatus'].map(id => [id, document.getElementById(id)]));
     const statusText = { active: 'Live', delayed: 'Location Delayed', offline: 'Offline', off_duty: 'Off Duty' };
     const colors = { active: '#18864b', delayed: '#d69000', offline: '#c23832', off_duty: '#596270' };
     const now = () => Date.now() + serverOffset;
@@ -70,14 +74,50 @@ if (root) {
         const speed = officer.speed == null ? '' : `<dt>Speed</dt><dd>${(officer.speed * 3.6).toFixed(1)} km/h</dd>`;
         const accuracy = officer.accuracy == null ? '' : `<dt>GPS Accuracy</dt><dd>±${Math.round(officer.accuracy)} m${officer.low_accuracy ? ' · Low accuracy' : ''}</dd>`;
         const personnel = officer.personnel_id ? `<dt>Personnel ID</dt><dd>${escapeHtml(officer.personnel_id)}</dd>` : '';
-        return `<div class="officer-info">${avatar(officer)}<h3>${escapeHtml(officer.name)}</h3><span class="map-status-label status-${officer.status}">${statusText[officer.status]}</span><dl>${personnel}<dt>Team</dt><dd>${escapeHtml(officer.team)}</dd><dt>Assigned Area</dt><dd>${escapeHtml(officer.area || 'Not assigned')}</dd><dt>Supervisor</dt><dd>${escapeHtml(officer.supervisor || 'Not assigned')}</dd><dt>Time In</dt><dd>${officer.time_in ? new Date(officer.time_in).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}) : 'Unavailable'}</dd><dt>Last Updated</dt><dd>${ageText(officer.received_at)}</dd>${accuracy}${speed}</dl><a href="${escapeHtml(officer.details_url)}">View Officer Details</a></div>`;
+        return `<div class="selected-officer-head">${avatar(officer)}<div><h3>${escapeHtml(officer.name)}</h3><span class="map-status-label status-${officer.status}">${statusText[officer.status]}</span></div></div><dl>${personnel}<dt>Team</dt><dd>${escapeHtml(officer.team)}</dd><dt>Assigned area</dt><dd>${escapeHtml(officer.area || 'Not assigned')}</dd><dt>Supervisor</dt><dd>${escapeHtml(officer.supervisor || 'Not assigned')}</dd><dt>Time in</dt><dd>${officer.time_in ? new Date(officer.time_in).toLocaleTimeString('en-PH', {hour:'numeric',minute:'2-digit',timeZone:'Asia/Manila'}) : 'Unavailable'}</dd><dt>Last reported</dt><dd>${ageText(officer.received_at)}</dd>${accuracy}${speed}<dt>Position</dt><dd>${officer.latitude == null || officer.longitude == null ? 'Not available' : officer.status === 'active' ? 'Latest reported location' : 'Last known location'}</dd></dl><a href="${escapeHtml(officer.details_url)}">View officer details</a>`;
+    }
+    function renderSelected() {
+        const officer = officers.get(selectedId);
+        elements.selectedOfficer.hidden = !officer;
+        if (!officer) return;
+        const markup = infoContent(officer);
+        if (elements.selectedOfficerContent.innerHTML !== markup) {
+            const restoreLink = elements.selectedOfficerContent.contains(document.activeElement);
+            elements.selectedOfficerContent.innerHTML = markup;
+            if (restoreLink) elements.selectedOfficerContent.querySelector('a').focus({preventScroll:true});
+        }
+    }
+    function setRosterCollapsed(collapsed) {
+        rosterCollapsed = collapsed;
+        root.querySelector('.officer-panel').classList.toggle('is-collapsed', collapsed);
+        root.querySelector('.location-main').classList.toggle('is-roster-collapsed', collapsed);
+        elements.officerPanelBody.hidden = collapsed;
+        elements.toggleOfficerPanel.setAttribute('aria-expanded', String(!collapsed));
+        const label = collapsed ? 'Expand officer list' : 'Collapse officer list';
+        elements.toggleOfficerPanel.setAttribute('aria-label', label);
+        elements.toggleOfficerPanel.title = label;
+        elements.toggleOfficerPanel.firstElementChild.textContent = collapsed ? '›' : '‹';
     }
     function selectOfficer(id) {
         const officer = officers.get(Number(id));
-        if (!officer || !map || !officerMarkers[id]) return;
-        selectedId = Number(id); renderList();
-        map.panTo({lat: officer.latitude, lng: officer.longitude}); map.setZoom(16);
-        infoWindow.setContent(infoContent(officer)); infoWindow.open({map, anchor: officerMarkers[id]});
+        if (!officer) return;
+        selectedId = Number(id); renderList(); renderSelected();
+        if (window.matchMedia('(max-width: 760px)').matches) {
+            setRosterCollapsed(true);
+            elements.closeOfficerDetails.focus({preventScroll:true});
+        }
+        if (!map || !officerMarkers[id]) return;
+        map.setZoom(16);
+        const projection = map.getProjection();
+        const point = projection?.fromLatLngToPoint(officerMarkers[id].getPosition());
+        // Keep the selected marker beside the roster and above the detail card.
+        if (point) {
+            const surface = root.querySelector('.location-main');
+            const offsetX = !rosterCollapsed && surface.clientWidth > 600 ? 160 : 0;
+            const offsetY = surface.clientHeight / 2 - Math.min(160, surface.clientHeight / 4);
+            const scale = 2 ** map.getZoom();
+            map.panTo(projection.fromPointToLatLng(new google.maps.Point(point.x - offsetX / scale, point.y + offsetY / scale)));
+        } else map.panTo(officerMarkers[id].getPosition());
     }
     function upsertMarker(officer) {
         if (!map || officer.latitude == null || officer.longitude == null) return;
@@ -92,22 +132,32 @@ if (root) {
         }
     }
     function renderList() {
-        const visible = filtered(); elements.officerCount.textContent = `${visible.length} shown`;
-        elements.officerList.innerHTML = visible.length ? visible.map(officer => `<button type="button" class="officer-row ${selectedId === officer.id ? 'is-selected' : ''}" data-officer-id="${officer.id}">${avatar(officer)}<span class="status-dot status-${officer.status}"></span><span class="officer-copy"><strong>${escapeHtml(officer.name)}</strong>${officer.personnel_id ? `<small>${escapeHtml(officer.personnel_id)}</small>` : ''}<small>${escapeHtml(officer.team)}${officer.area ? ` · ${escapeHtml(officer.area)}` : ''}</small><small class="officer-age">${statusText[officer.status]} · ${ageText(officer.received_at)}</small></span>${officer.low_accuracy ? '<span class="accuracy-alert" title="Low GPS accuracy">!</span>' : ''}</button>`).join('') : `<div class="location-empty">${elements.teamFilter.value ? 'No active officers found for this team.' : 'No officers are currently sharing their location.'}</div>`;
-        elements.officerList.querySelectorAll('[data-officer-id]').forEach(row => row.addEventListener('click', () => selectOfficer(row.dataset.officerId)));
+        const visible = filtered(); elements.officerCount.textContent = `${visible.length} of ${officers.size} officers`;
+        elements.clearOfficerSearch.hidden = !elements.officerSearch.value;
+        const hasFilters = [elements.officerSearch,elements.teamFilter,elements.statusFilter,elements.areaFilter].some(control => control.value);
+        const markup = visible.length ? visible.map(officer => `<button type="button" class="officer-row ${selectedId === Number(officer.id) ? 'is-selected' : ''}" aria-pressed="${selectedId === Number(officer.id)}" data-officer-id="${Number(officer.id)}">${avatar(officer)}<span class="status-dot status-${officer.status}" aria-hidden="true"></span><span class="officer-copy"><strong>${escapeHtml(officer.name)}</strong>${officer.personnel_id ? `<small>${escapeHtml(officer.personnel_id)}</small>` : ''}<small>${escapeHtml(officer.team)}${officer.area ? ` · ${escapeHtml(officer.area)}` : ''}</small><small class="officer-age">${statusText[officer.status]} · ${ageText(officer.received_at)}</small></span>${officer.low_accuracy ? '<span class="accuracy-alert" title="Low GPS accuracy" aria-label="Low GPS accuracy">!</span>' : ''}</button>`).join('') : `<div class="location-empty"><strong>${hasFilters ? 'No matching officers' : 'No locations yet'}</strong>${hasFilters ? 'Try another name, team, area, or status.<br><button type="button" class="location-button" data-reset-filters>Clear filters</button>' : 'Officer positions appear here when location reports are received.'}</div>`;
+        if (markup !== lastListMarkup) {
+            const focusedId = elements.officerList.contains(document.activeElement) ? document.activeElement.dataset.officerId : null;
+            elements.officerList.innerHTML = markup;
+            lastListMarkup = markup;
+            if (focusedId) elements.officerList.querySelector(`[data-officer-id="${Number(focusedId)}"]`)?.focus({preventScroll:true});
+        }
         const visibleIds = new Set(visible.map(item => item.id));
         Object.entries(officerMarkers).forEach(([id, marker]) => marker.setMap(visibleIds.has(Number(id)) ? map : null));
+        if (selectedId !== null && !visible.some(officer => Number(officer.id) === selectedId)) closeSelection();
     }
     function updateSummary() {
         const list = [...officers.values()]; list.forEach(item => item.status = computedStatus(item));
         elements.summaryOnDuty.textContent = list.length;
         elements.summaryTeams.textContent = list.filter(item => item.status === 'active').length;
         elements.summaryAlerts.textContent = list.filter(item => item.status === 'delayed').length;
-        elements.summaryOffline.textContent = list.filter(item => ['offline', 'off_duty'].includes(item.status)).length;
+        elements.summaryOffline.textContent = list.filter(item => item.status === 'offline').length;
+        elements.summaryOffDuty.textContent = list.filter(item => item.status === 'off_duty').length;
     }
     function fillOptions(select, values, key = null) {
         const current = select.value; const first = select.options[0].outerHTML;
-        select.innerHTML = first + values.map(value => `<option value="${escapeHtml(key ? value[key] : value)}">${escapeHtml(key ? value.name : value)}</option>`).join(''); select.value = current;
+        select.innerHTML = first + values.map(value => `<option value="${escapeHtml(key ? value[key] : value)}">${escapeHtml(key ? value.name : value)}</option>`).join('');
+        select.value = [...select.options].some(option => option.value === current) ? current : '';
     }
     function syncSubscriptions() {
         const selectedTeam = Number(elements.teamFilter.value);
@@ -121,60 +171,111 @@ if (root) {
             subscriptions.add(id);
             window.Echo.private(`team.${id}.locations`).listen('.OfficerLocationUpdated', event => {
                 const officer = event.officer; officer.status = computedStatus(officer); officers.set(Number(officer.id), officer);
-                upsertMarker(officer); renderList(); updateSummary();
-                if (selectedId === Number(officer.id) && infoWindow.getMap()) infoWindow.setContent(infoContent(officer));
+                upsertMarker(officer); renderList(); updateSummary(); renderSelected();
             });
         });
     }
     async function loadLocations({fit = false} = {}) {
+        locationRequest?.abort();
+        locationRequest = new AbortController();
+        const controller = locationRequest;
+        const version = ++requestVersion;
+        const timeout = window.setTimeout(() => controller.abort(), 15000);
         elements.refreshLocations.disabled = true;
+        elements.refreshLocations.setAttribute('aria-busy', 'true');
+        elements.officerList.setAttribute('aria-busy', 'true');
         try {
-            const response = await fetch(endpoint, {headers: {'Accept':'application/json','X-Requested-With':'XMLHttpRequest'}, credentials:'same-origin'});
+            const response = await fetch(endpoint, {headers: {'Accept':'application/json','X-Requested-With':'XMLHttpRequest'}, credentials:'same-origin', signal:controller.signal});
             if (response.status === 401 || response.status === 419) { window.location.reload(); return; }
             if (!response.ok) throw new Error('Location data request failed');
-            const data = await response.json(); serverOffset = new Date(data.server_time).getTime() - Date.now();
+            const data = await response.json();
+            if (version !== requestVersion) return;
+            serverOffset = new Date(data.server_time).getTime() - Date.now();
             officers.clear(); data.officers.forEach(officer => { officer.status = computedStatus(officer); officers.set(Number(officer.id), officer); upsertMarker(officer); });
+            Object.keys(officerMarkers).filter(id => !officers.has(Number(id))).forEach(id => { officerMarkers[id].setMap(null); delete officerMarkers[id]; });
             fillOptions(elements.teamFilter, data.teams, 'id'); fillOptions(elements.areaFilter, data.areas);
             authorizedTeamIds = data.teams.map(team => Number(team.id)); syncSubscriptions();
-            renderList(); updateSummary();
+            hasLoaded = true;
+            elements.locationDataStatus.hidden = true;
+            renderList(); updateSummary(); renderSelected();
             if (map && (fit || !hasFittedBounds)) fitBounds();
-        } catch (error) { elements.officerList.innerHTML = '<div class="location-empty is-error">Officer locations could not be loaded. Try Refresh.</div>'; }
-        finally { elements.refreshLocations.disabled = false; }
+        } catch (error) {
+            if (version !== requestVersion) return;
+            elements.locationDataStatus.hidden = false;
+            elements.locationDataStatus.textContent = hasLoaded ? 'Could not refresh. Showing previously received locations. Try Refresh.' : 'Officer locations could not be loaded. Try Refresh.';
+            if (!hasLoaded) {
+                elements.officerList.innerHTML = '<div class="location-empty"><strong>Locations unavailable</strong>Use Refresh to try again.</div>';
+                lastListMarkup = '';
+                elements.officerCount.textContent = 'Unavailable';
+            }
+        } finally {
+            window.clearTimeout(timeout);
+            if (version === requestVersion) {
+                elements.refreshLocations.disabled = false;
+                elements.refreshLocations.setAttribute('aria-busy', 'false');
+                elements.officerList.setAttribute('aria-busy', 'false');
+            }
+        }
     }
     function fitBounds() {
         const points = filtered().filter(item => item.latitude != null);
         if (!map || !points.length) return;
         if (points.length === 1) { map.setCenter({lat:Number(points[0].latitude),lng:Number(points[0].longitude)}); map.setZoom(15); }
-        else { const bounds = new google.maps.LatLngBounds(); points.forEach(item => bounds.extend({lat:Number(item.latitude),lng:Number(item.longitude)})); map.fitBounds(bounds, 70); }
+        else { const bounds = new google.maps.LatLngBounds(); points.forEach(item => bounds.extend({lat:Number(item.latitude),lng:Number(item.longitude)})); map.fitBounds(bounds, {top:60,right:60,bottom:60,left:!rosterCollapsed && root.querySelector('.location-main').clientWidth > 760 ? 350 : 60}); }
         hasFittedBounds = true;
     }
     window.initOfficerMap = () => {
-        map = new google.maps.Map(document.getElementById('officerMap'), {center:{lat:center.latitude,lng:center.longitude},zoom:13,mapTypeControl:false,streetViewControl:false,fullscreenControl:true});
-        infoWindow = new google.maps.InfoWindow(); elements.mapStatus.hidden = true;
+        map = new google.maps.Map(document.getElementById('officerMap'), {center:{lat:center.latitude,lng:center.longitude},zoom:13,mapTypeControl:false,streetViewControl:false,fullscreenControl:true,fullscreenControlOptions:{position:google.maps.ControlPosition.RIGHT_TOP},zoomControlOptions:{position:google.maps.ControlPosition.RIGHT_CENTER}});
+        elements.mapStatus.hidden = true;
         [...officers.values()].forEach(upsertMarker); fitBounds();
     };
     function loadMap() {
-        if (!root.dataset.mapKey) { elements.mapStatus.textContent = 'Google Maps is not configured. Set GOOGLE_MAPS_BROWSER_KEY.'; elements.mapStatus.classList.add('is-error'); return; }
+        const showMapError = message => { elements.mapStatus.hidden = false; elements.mapStatus.textContent = message; elements.mapStatus.classList.add('is-error'); };
+        if (!root.dataset.mapKey) { showMapError('Map unavailable. Ask your administrator to configure the map service. Officer details are still available in the list.'); return; }
         window.gm_authFailure = () => {
-            elements.mapStatus.textContent = 'Google Maps rejected the API key. Allow this site in the key restrictions and enable Maps JavaScript API.';
-            elements.mapStatus.classList.add('is-error');
+            showMapError('The map service could not connect. Ask your administrator to check map access. Officer details are still available in the list.');
         };
-        const script = document.createElement('script'); script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(root.dataset.mapKey)}&callback=initOfficerMap`; script.async = true; script.onerror = () => { elements.mapStatus.textContent = 'Google Maps failed to initialize.'; elements.mapStatus.classList.add('is-error'); }; document.head.appendChild(script);
+        const mapTimeout = window.setTimeout(() => { if (!map) showMapError('The map is taking longer to load. Refresh the page to try again. Officer details are still available in the list.'); }, 20000);
+        const script = document.createElement('script'); script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(root.dataset.mapKey)}&callback=initOfficerMap`; script.async = true; script.onerror = () => { window.clearTimeout(mapTimeout); showMapError('Map could not load. Refresh the page to try again. Officer details are still available in the list.'); }; document.head.appendChild(script);
     }
-    ['input','change'].forEach(event => [elements.officerSearch,elements.statusFilter,elements.areaFilter].forEach(control => control.addEventListener(event, renderList)));
+    function closeSelection({restoreFocus = false} = {}) {
+        const previousId = selectedId;
+        selectedId = null;
+        elements.selectedOfficer.hidden = true;
+        if (restoreFocus) {
+            setRosterCollapsed(false);
+            renderList();
+            (elements.officerList.querySelector(`[data-officer-id="${Number(previousId)}"]`) || elements.officerSearch).focus({preventScroll:true});
+        }
+    }
+    elements.officerList.addEventListener('click', event => {
+        const row = event.target.closest('[data-officer-id]');
+        if (row) selectOfficer(row.dataset.officerId);
+        if (event.target.closest('[data-reset-filters]')) {
+            [elements.officerSearch,elements.teamFilter,elements.statusFilter,elements.areaFilter].forEach(control => { control.value = ''; });
+            syncSubscriptions(); renderList(); elements.officerSearch.focus();
+        }
+    });
+    elements.toggleOfficerPanel.addEventListener('click', () => setRosterCollapsed(!rosterCollapsed));
+    elements.closeOfficerDetails.addEventListener('click', () => closeSelection({restoreFocus:true}));
+    elements.selectedOfficer.addEventListener('keydown', event => { if (event.key === 'Escape') closeSelection({restoreFocus:true}); });
+    elements.clearOfficerSearch.addEventListener('click', () => { elements.officerSearch.value = ''; renderList(); elements.officerSearch.focus(); });
+    elements.officerSearch.addEventListener('input', event => { if (!event.isComposing) renderList(); });
+    elements.officerSearch.addEventListener('compositionend', renderList);
+    [elements.statusFilter,elements.areaFilter].forEach(control => control.addEventListener('change', renderList));
     elements.teamFilter.addEventListener('change', () => { syncSubscriptions(); renderList(); loadLocations(); });
     elements.refreshLocations.addEventListener('click', () => loadLocations({fit:true}));
     elements.fitAllLocations.addEventListener('click', fitBounds);
     const connection = window.Echo?.connector?.pusher?.connection;
     if (connection) {
-        const showConnected = () => { elements.liveConnection.className = 'connection-state is-live'; elements.liveConnection.innerHTML = '<span></span>Live monitoring restored'; };
+        const showConnected = () => { elements.liveConnection.className = 'connection-state is-live'; elements.liveConnection.innerHTML = '<span></span>Connected'; };
         connection.bind('connected', () => { showConnected(); loadLocations(); });
         connection.bind('disconnected', () => { elements.liveConnection.className = 'connection-state is-warning'; elements.liveConnection.innerHTML = '<span></span>Live connection unavailable. Reconnecting…'; });
         connection.bind('error', () => { elements.liveConnection.className = 'connection-state is-warning'; elements.liveConnection.innerHTML = '<span></span>Live connection unavailable. Reconnecting…'; });
         if (connection.state === 'connected') showConnected();
     } else {
         elements.liveConnection.className = 'connection-state is-warning';
-        elements.liveConnection.innerHTML = '<span></span>Live monitoring could not initialize';
+        elements.liveConnection.innerHTML = '<span></span>Live updates unavailable';
     }
-    loadLocations(); loadMap(); window.setInterval(() => { renderList(); updateSummary(); Object.values(officerMarkers).forEach(marker => { const officer = [...officers.values()].find(item => marker === officerMarkers[item.id]); if (officer) marker.setIcon(portraitIcon({...officer, status: computedStatus(officer)})); }); }, 10000);
+    loadLocations(); loadMap(); window.setInterval(() => { if (!hasLoaded) return; renderList(); updateSummary(); renderSelected(); Object.values(officerMarkers).forEach(marker => { const officer = [...officers.values()].find(item => marker === officerMarkers[item.id]); if (officer) marker.setIcon(portraitIcon({...officer, status: computedStatus(officer)})); }); }, 10000);
 }

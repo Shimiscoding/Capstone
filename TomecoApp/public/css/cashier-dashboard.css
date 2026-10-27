@@ -1,0 +1,28 @@
+/* Cashier overview consumes the shared dashboard shell, table, and palette. */
+.cashier-tickets-table { min-width: 940px; table-layout: fixed; }
+.cashier-tickets-table th:nth-child(1) { width: 105px; }
+.cashier-tickets-table th:nth-child(2) { width: 165px; }
+.cashier-tickets-table th:nth-child(3) { width: 115px; }
+.cashier-tickets-table th:nth-child(4) { width: 225px; }
+.cashier-tickets-table th:nth-child(5) { width: 115px; }
+.cashier-tickets-table th:nth-child(6) { width: 105px; }
+.cashier-tickets-table th:nth-child(7) { width: 110px; }
+.cashier-tickets-table tbody th,
+.cashier-tickets-table td { overflow-wrap: anywhere; vertical-align: top; line-height: 1.6; }
+.cashier-tickets-table tbody .cashier-ticket-id {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--line);
+    background: var(--panel);
+    color: var(--accent);
+    font-size: 12px;
+    text-align: left;
+    letter-spacing: normal;
+}
+.cashier-tickets-table .cashier-fine { font-variant-numeric: tabular-nums; font-weight: 650; white-space: nowrap; }
+.cashier-tickets-table time small { display: block; color: var(--muted); }
+.cashier-workspace .table-scroll:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+@media (max-width: 640px) {
+    .cashier-workspace .page-head { flex-direction: column; gap: 12px; }
+    .cashier-workspace .table-footer { flex-wrap: wrap; gap: 12px; }
+}
