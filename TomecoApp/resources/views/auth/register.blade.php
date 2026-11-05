@@ -1,101 +1,22 @@
-<!DOCTYPE html>
-<html lang= "en-US">
+<x-auth-layout title="Admin sign up" page="register">
+    <p class="auth-page-label">Sign up</p>
+    <h1 id="auth-heading" class="auth-title">Create your account.</h1>
+    <p class="auth-description">Get started with an administrator account for TOMECO.</p>
 
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Admin sign up</title>
-    <link rel="stylesheet" href="{{ asset('css/auth.css') }}">
-</head>
-
-<body class="auth-page login-page">
-    <main class="auth-shell">
-        <section class="auth-card">
-            <div class="auth-brand auth-brand-with-logo">
-                <img src="{{ asset('images/Tomeco_icon.jpg') }}" alt="TOMECO official seal">
-                <span>
-                    <strong>TOMECO</strong>
-                    <small>Traffic Operation Management Enforcement and Control Office Tacloban</small>
-                </span>
-            </div>
-            <h1 class="auth-title">Create an admin account</h1>
-
-            <form method="POST" action="{{ route('register.store') }}" class="auth-form">
-                @csrf
-
-                <div><label for="firstName" class="auth-label">First name</label><input id="firstName" name="firstName"
-                        type="text" value="{{ old('firstName') }}" autocomplete="given-name" required autofocus
-                        class="auth-input">
-                    @error('firstName')
-                        <p class="auth-error">{{ $message }}</p>
-                    @enderror
-                </div>
-                <div><label for="middleName" class="auth-label">Middle name <small>(optional)</small></label><input
-                        id="middleName" name="middleName" type="text" value="{{ old('middleName') }}"
-                        autocomplete="additional-name" class="auth-input">
-                    @error('middleName')
-                        <p class="auth-error">{{ $message }}</p>
-                    @enderror
-                </div>
-                <div><label for="lastName" class="auth-label">Last name</label><input id="lastName" name="lastName"
-                        type="text" value="{{ old('lastName') }}" autocomplete="family-name" required
-                        class="auth-input">
-                    @error('lastName')
-                        <p class="auth-error">{{ $message }}</p>
-                    @enderror
-                </div>
-                <div><label for="nameExtension" class="auth-label">Extension <small>(optional)</small></label><input
-                        id="nameExtension" name="nameExtension" type="text" value="{{ old('nameExtension') }}"
-                        placeholder="Jr., Sr., III" class="auth-input">
-                    @error('nameExtension')
-                        <p class="auth-error">{{ $message }}</p>
-                    @enderror
-                </div>
-
-                <div>
-                    <label for="phoneNumber" class="auth-label">Phone number</label>
-                    <input id="phoneNumber" name="phoneNumber" type="tel" value="{{ old('phoneNumber') }}"
-                        placeholder="09171234567" inputmode="numeric" pattern="09[0-9]{9}" minlength="11" maxlength="11"
-                        title="Enter exactly 11 digits starting with 09" autocomplete="tel"
-                        oninput="this.value=this.value.replace(/\D/g, '').slice(0, 11)" required class="auth-input">
-                    @error('phoneNumber')
-                        <p class="auth-error">{{ $message }}</p>
-                    @enderror
-                </div>
-
-                <div>
-                    <label for="email" class="auth-label">Email</label>
-                    <input id="email" name="email" type="email" value="{{ old('email') }}"
-                        autocomplete="email" required class="auth-input">
-                    @error('email')
-                        <p class="auth-error">{{ $message }}</p>
-                    @enderror
-                </div>
-
-                <div>
-                    <label for="password" class="auth-label">Password</label>
-                    <input id="password" name="password" type="password" autocomplete="new-password" required
-                        class="auth-input">
-                    @error('password')
-                        <p class="auth-error">{{ $message }}</p>
-                    @enderror
-                </div>
-
-                <div>
-                    <label for="password_confirmation" class="auth-label">Confirm password</label>
-                    <input id="password_confirmation" name="password_confirmation" type="password"
-                        autocomplete="new-password" required class="auth-input">
-                </div>
-
-                <button type="submit" class="auth-button">Create admin account</button>
-            </form>
-
-            <p class="auth-note">
-                Already have an account?
-                <a href="{{ route('login') }}" class="auth-link">Log in</a>
-            </p>
-        </section>
-    </main>
-</body>
-
-</html>
+    <form method="POST" action="{{ route('register.store') }}" class="auth-form" data-auth-form novalidate>
+        @csrf
+        <div class="auth-fields-grid">
+            <x-auth-field name="firstName" label="First name" autocomplete="given-name" placeholder="First name" required autofocus maxlength="100" />
+            <x-auth-field name="middleName" label="Middle name" autocomplete="additional-name" placeholder="Middle name" optional maxlength="100" />
+            <x-auth-field name="lastName" label="Last name" autocomplete="family-name" placeholder="Last name" required maxlength="100" />
+            <x-auth-field name="nameExtension" label="Extension" placeholder="Jr., Sr., III" optional maxlength="20" />
+            <x-auth-field name="email" label="Email" type="email" autocomplete="email" placeholder="you@example.com" required maxlength="255" />
+            <x-auth-field name="phoneNumber" label="Phone number" type="tel" autocomplete="tel" placeholder="09XXXXXXXXX" inputmode="numeric" pattern="09[0-9]{9}" minlength="11" maxlength="11" required hint="11 digits, starting with 09." />
+            <x-auth-field name="password" label="Password" type="password" autocomplete="new-password" placeholder="Create a password" required minlength="{{ $passwordMinLength }}" hint="At least {{ $passwordMinLength }} characters." />
+            <x-auth-field name="password_confirmation" label="Confirm password" type="password" autocomplete="new-password" placeholder="Repeat your password" required />
+        </div>
+        <p class="auth-form-status sr-only" role="status" aria-live="polite"></p>
+        <button type="submit" class="auth-button" data-busy-label="Creating account…">Create admin account <span aria-hidden="true">→</span></button>
+    </form>
+    <p class="auth-note">Already have an account? <a href="{{ route('login') }}" class="auth-link">Log in</a></p>
+</x-auth-layout>

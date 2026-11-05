@@ -41,7 +41,7 @@ class AttendanceController extends Controller
         $coordinates = $this->coordinates($request);
 
         $attendance = $this->todayAttendance($officer);
-        if ($error = $rules->timeOutError($officer, session: $attendance?->session)) {
+        if ($error = $rules->timeOutError($officer)) {
             return response()->json(['message' => $error], 422);
         }
 
@@ -73,14 +73,13 @@ class AttendanceController extends Controller
         $attendance = $this->todayAttendance($officer);
 
         return response()->json([
-            'session' => $attendance?->session ?? $rules->session($officer),
+            'session' => EnforcerAttendance::WHOLE_DAY,
             'date' => $rules->date(),
             'schedule' => $rules->schedule($officer),
-            'sessions' => collect(['morning', 'afternoon'])->mapWithKeys(function ($session) use ($officer, $rules) {
-                $record = EnforcerAttendance::where('user_id', $officer->id)->whereDate('attendance_date', $rules->date())->where('session', $session)->first();
-
-                return [$session => ['status' => $record?->time_out ? 'timed_out' : ($record?->time_in ? 'timed_in' : 'not_timed_in'), 'attendance' => $record ? $this->attendanceData($record) : null]];
-            }),
+            'sessions' => [EnforcerAttendance::WHOLE_DAY => [
+                'status' => $attendance?->time_out ? 'timed_out' : ($attendance?->time_in ? 'timed_in' : 'not_timed_in'),
+                'attendance' => $attendance ? $this->attendanceData($attendance) : null,
+            ]],
             'status' => match (true) {
                 $attendance?->time_out !== null => 'timed_out',
                 $attendance?->time_in !== null => 'timed_in',
@@ -109,7 +108,7 @@ class AttendanceController extends Controller
 
         return EnforcerAttendance::where('user_id', $officer->id)
             ->whereDate('attendance_date', app(AttendanceRules::class)->date())
-            ->where('session', app(AttendanceRules::class)->session($officer))
+            ->latest('time_in')->orderByDesc('id')
             ->first();
     }
 

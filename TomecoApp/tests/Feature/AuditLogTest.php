@@ -58,7 +58,7 @@ class AuditLogTest extends TestCase
         $user = User::factory()->create();
         $notificationId = (string) Str::uuid();
 
-        (new DatabaseNotification())->forceFill([
+        (new DatabaseNotification)->forceFill([
             'id' => $notificationId,
             'type' => 'TestNotification',
             'notifiable_type' => User::class,
@@ -85,6 +85,115 @@ class AuditLogTest extends TestCase
             ->assertDontSeeText('IP address')
             ->assertDontSeeText('Changes');
 
-        $this->actingAs($supervisor)->get(route('dashboard.audit-logs'))->assertForbidden();
+        foreach ([$supervisor, User::factory()->create(['role' => User::ROLE_OFFICER]), User::factory()->create(['role' => User::ROLE_CASHIER])] as $staff) {
+            $this->actingAs($staff)->get(route('dashboard.audit-logs'))->assertForbidden();
+        }
+
+        $this->actingAs($supervisor)->get(route('dashboard'))
+            ->assertOk()->assertDontSeeText('Audit Log');
+        $this->get(route('dashboard.audit-logs', ['actor_role' => User::ROLE_OFFICER]))->assertForbidden();
+    }
+
+    public function test_created_records_show_saved_values_without_empty_comparisons(): void
+    {
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        AuditLog::query()->delete();
+        AuditLog::create([
+            'event' => 'created', 'auditable_type' => User::class, 'auditable_id' => '100',
+            'subject_label' => 'Created sample account',
+            'changes' => [
+                'firstName' => ['old' => null, 'new' => 'Created value'],
+                'middleName' => ['old' => null, 'new' => null],
+                'nameExtension' => ['old' => null, 'new' => ''],
+                'attendance_working_days' => ['old' => null, 'new' => []],
+                'attendance_restrictions_enabled' => ['old' => null, 'new' => false],
+                'sample_count' => ['old' => null, 'new' => 0],
+            ],
+        ]);
+
+        $response = $this->actingAs($admin)->get(route('dashboard.audit-logs'));
+        $response->assertOk()->assertSeeText('Created user account')
+            ->assertSeeText('View 3 recorded fields')->assertSeeText('Created value')
+            ->assertSeeText('No')->assertSeeText('0')->assertDontSeeText('Empty')
+            ->assertDontSeeText('Middle Name')->assertDontSeeText('Name Extension')
+            ->assertDontSee('class="audit-old-value"', false)->assertDontSee('&rarr;', false);
+    }
+
+    public function test_deleted_records_show_removed_values_without_empty_comparisons(): void
+    {
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        AuditLog::query()->delete();
+        AuditLog::create([
+            'event' => 'deleted', 'auditable_type' => User::class, 'auditable_id' => '101',
+            'subject_label' => 'Deleted sample account',
+            'changes' => ['firstName' => ['old' => 'Removed value', 'new' => null]],
+        ]);
+
+        $this->actingAs($admin)->get(route('dashboard.audit-logs'))->assertOk()
+            ->assertSeeText('Deleted user account')->assertSeeText('Removed value')
+            ->assertSeeText('View 1 recorded field')->assertDontSeeText('Empty')
+            ->assertDontSee('&rarr;', false);
+    }
+
+    public function test_role_filters_use_the_recorded_actor_and_combine_with_search_and_event(): void
+    {
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $formerOfficer = User::factory()->create(['role' => User::ROLE_SUPERVISOR]);
+        AuditLog::query()->delete();
+        foreach ([
+            ['officer', 'updated', 'Officer match', 'Archived Enforcer'],
+            ['officer', 'created', 'Officer create', 'Archived Enforcer'],
+            ['supervisor', 'updated', 'Supervisor match', 'Supervisor Actor'],
+            ['admin', 'updated', 'Admin match', 'Administrator Actor'],
+        ] as [$role, $event, $subject, $name]) {
+            AuditLog::create([
+                'user_id' => $role === 'officer' ? $formerOfficer->id : null,
+                'actor_name' => $name, 'actor_role' => $role, 'event' => $event,
+                'auditable_type' => User::class, 'auditable_id' => (string) $admin->id,
+                'subject_label' => $subject, 'changes' => ['area' => ['old' => 'Old area', 'new' => 'New area']],
+            ]);
+        }
+
+        $this->actingAs($admin)->get(route('dashboard.audit-logs', [
+            'actor_role' => 'officer', 'event' => 'updated', 'search' => 'Archived Enforcer',
+        ]))->assertOk()->assertSeeText('Officer match')->assertDontSeeText('Officer create')
+            ->assertDontSeeText('Supervisor match')->assertDontSeeText('Admin match')
+            ->assertViewHas('logs', fn ($logs) => $logs->total() === 1);
+
+        $formerOfficer->delete();
+        $this->get(route('dashboard.audit-logs', ['actor_role' => 'officer', 'search' => 'Archived Enforcer']))
+            ->assertOk()->assertSeeText('Officer match')->assertSeeText('Officer create');
+        $this->get(route('dashboard.audit-logs', ['actor_role' => 'supervisor']))
+            ->assertOk()->assertSeeText('Supervisor match')->assertDontSeeText('Officer match');
+        $this->get(route('dashboard.audit-logs', ['actor_role' => 'invalid']))
+            ->assertOk()->assertSeeText('Officer match')->assertSeeText('Admin match');
+        $this->get(route('dashboard.audit-logs', ['actor_role' => 'supervisor', 'search' => 'no matching event']))
+            ->assertOk()->assertSeeText('No activity found')->assertSeeText('Reset filters');
+    }
+
+    public function test_pagination_keeps_filters_and_clamps_out_of_range_pages(): void
+    {
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        AuditLog::query()->delete();
+        foreach (range(1, 21) as $index) {
+            AuditLog::create([
+                'actor_role' => User::ROLE_OFFICER, 'event' => 'created',
+                'auditable_type' => User::class, 'auditable_id' => (string) $index,
+                'subject_label' => 'Matching event '.$index, 'changes' => [],
+                'created_at' => now()->startOfDay(),
+            ]);
+        }
+
+        $filters = ['actor_role' => 'officer', 'event' => 'created', 'search' => 'Matching'];
+        $this->actingAs($admin)->get(route('dashboard.audit-logs', $filters))
+            ->assertOk()->assertViewHas('logs', function ($logs): bool {
+                parse_str(parse_url($logs->nextPageUrl(), PHP_URL_QUERY), $query);
+
+                return $logs->count() === 20 && $logs->total() === 21
+                    && $logs->first()->subject_label === 'Matching event 21'
+                    && $query === ['actor_role' => 'officer', 'event' => 'created', 'search' => 'Matching', 'page' => '2'];
+            });
+        $this->get(route('dashboard.audit-logs', $filters + ['page' => 999]))
+            ->assertOk()->assertViewHas('logs', fn ($logs) => $logs->currentPage() === 2 && $logs->count() === 1);
     }
 }

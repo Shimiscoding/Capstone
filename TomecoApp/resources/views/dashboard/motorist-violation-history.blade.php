@@ -46,7 +46,7 @@
                         <td><span class="cell-wrap">{{ $record->location ?: 'Not recorded' }}</span></td>
                         <td><strong>{{ $record->enforcer_name ?: $record->enforcer?->fullName ?: 'Not recorded' }}</strong><small>{{ filled($record->enforcer_signature) ? 'Signature recorded' : 'Signature missing' }}</small></td>
                         <td>{{ $record->created_at?->format('M d, Y') ?? '—' }}</td>
-                        <td><strong>&#8369;{{ number_format($record->fine_amount, 2) }}</strong><span class="status-badge {{ $record->status === 'paid' ? '' : 'status-pending' }}"><i></i>{{ ucfirst($record->status ?: 'unpaid') }}</span></td>
+                        <td><div class="motorist-fine-status"><strong>&#8369;{{ number_format($record->fine_amount, 2) }}</strong><span class="status-badge {{ $record->status === 'paid' ? '' : 'status-pending' }}">{{ ucfirst($record->status ?: 'unpaid') }}</span></div></td>
                         <td class="actions-column"><a class="row-view-action" href="{{ route('dashboard.violation-records.show', $record) }}" aria-label="View ticket #{{ str_pad((string) $record->id, 7, '0', STR_PAD_LEFT) }}">View</a></td>
                     </tr>
                 @endforeach

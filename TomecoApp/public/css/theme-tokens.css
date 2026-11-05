@@ -1,0 +1,23 @@
+:root {
+    --scrollbar-thumb: #cbd5e1;
+    --scrollbar-track: #f8fafc;
+    --scrollbar-hover: #94a3b8;
+    --scrollbar-active: #64748b;
+    --bg: #f8fafc;
+    --panel: #ffffff;
+    --line: #e2e8f0;
+    --line-strong: #cbd5e1;
+    --text: #0f172a;
+    --muted: #64748b;
+    --soft: #f8fafc;
+    --active: #f1f5f9;
+    --accent: #b42318;
+    --blue: #b42318;
+    --green: #0b8f55;
+    --yellow: #f4c542;
+    --shadow: 0 1px 2px rgba(15, 23, 42, .06);
+    --font-sans: "Segoe UI", Tahoma, Arial, sans-serif;
+    --radius-control: 6px;
+    --radius-surface: 8px;
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}

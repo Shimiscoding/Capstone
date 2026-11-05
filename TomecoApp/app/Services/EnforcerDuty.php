@@ -16,16 +16,16 @@ class EnforcerDuty
             if ($user->enforcerAttendances()->whereNotNull('time_in')->whereNull('time_out')->exists()) {
                 throw ValidationException::withMessages(['attendance' => 'You must time out of your current duty before timing in again.']);
             }
-            $attendance = EnforcerAttendance::firstOrCreate([
-                'user_id' => $user->id,
-                'attendance_date' => $rules->date(),
-                'session' => $rules->session($user),
-            ], $values);
-            if (! $attendance->wasRecentlyCreated) {
-                throw ValidationException::withMessages(['attendance' => 'You have already timed in for this duty session today.']);
+            if ($user->enforcerAttendances()->whereDate('attendance_date', $rules->date())->exists()) {
+                throw ValidationException::withMessages(['attendance' => 'You have already timed in today.']);
             }
 
-            return $attendance;
+            return EnforcerAttendance::create([
+                ...$values,
+                'user_id' => $user->id,
+                'attendance_date' => $rules->date(),
+                'session' => EnforcerAttendance::WHOLE_DAY,
+            ]);
         });
     }
 }

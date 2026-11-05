@@ -1,91 +1,122 @@
 ---
 version: alpha
+name: TOMECO
+description: Compact operational records for traffic staff in Tacloban.
 colors:
-  brand: "#8f1d1d"
-  brand-soft: "#fff1f1"
-  ink: "#263244"
+  primary: "#b42318"
+  background: "#f8fafc"
+  surface: "#ffffff"
+  text: "#0f172a"
   muted: "#64748b"
-  canvas: "#f5f7f9"
-  line: "#dfe3e8"
+  border: "#e2e8f0"
 typography:
   sans:
-    fontFamily: "Inter, Segoe UI, Arial, sans-serif"
-  data:
-    fontFamily: "Inter, Segoe UI, Arial, sans-serif"
+    fontFamily: "Segoe UI, Tahoma, Arial, sans-serif"
 rounded:
   control: "6px"
   surface: "8px"
 spacing:
-  compact: "8px"
   section: "16px"
 components:
   table:
-    density: "compact"
-  card:
-    elevation: "subtle"
+    backgroundColor: surface
+    textColor: text
+  dialog:
+    backgroundColor: surface
+    textColor: text
 ---
 
 ## Overview
 
-TOMECO is an operational civic interface for traffic staff. It should feel like a well-kept official record: compact, calm, legible, and trustworthy. The signature element is the ticket number rendered as the primary record anchor. Avoid oversized dashboard typography, decorative gradients, and consumer-app ornament.
+The interface follows an official attendance register: compact rows, readable
+timestamps, restrained red navigation, and clear record actions. It serves traffic
+staff using the existing English website in the Philippines. The daily pair of
+Time In and Time Out windows is the attendance workflow's organizing element.
+Preserve the existing product shell rather than adding a separate visual system.
 
 ## Colors
 
-TOMECO red marks active navigation and primary record links. Neutral ink and ruled surfaces carry most of the interface. Green and amber are reserved for recorded/complete and missing/pending states.
+Runtime tokens remain owned by `public/css/theme-tokens.css`, imported by both
+`dashboard.css` and `auth.css`. This document mirrors
+its palette: primary maps to `--accent`, background to `--bg`, surface to
+`--panel`, text to `--text`, muted to `--muted`, and border to `--line`.
 
 ## Typography
 
-Use the existing system-first sans stack. Data tables use 10–12px supporting text with strong labels; page headings remain restrained.
+Reuse the existing system sans stack, compact table text, and tabular timestamps.
+Labels and explicit status text carry meaning alongside color.
 
 ## Layout
 
-Tables prioritize scanning and horizontal stability. Complete records open on dedicated pages with a two-column desktop layout and one-column narrow layout.
+Reuse the shared desktop sidebar and narrow overlay navigation. Tables scroll
+horizontally within their cards. Attendance settings use the existing responsive
+dialog with one Time In row, one Time Out row, and working-day checkboxes.
 
 ## Elevation & Depth
 
-Use borders for structure and subtle shadows only for temporary menus.
+Borders organize records. Temporary menus and dialogs use the established shadows.
 
 ## Shapes
 
-Controls use 6px corners; record surfaces use 8px corners. Pills are reserved for statuses.
+Keep existing control and surface radii; status badges retain their current shape.
 
 ## Components
 
-Tables expose one explicit actions column. Evidence and signature panels always show a visible Recorded or Not recorded state.
+`components.page-loader` provides the shared navigation loading screen in the
+authentication, administrator/cashier, and supervisor layouts. `page-loader.css`
+uses the canonical palette and system font: an opaque white surface, the TOMECO
+seal, and a small red indeterminate spinner. Its native dialog sits above other
+dialogs and keeps background controls inert while navigation is pending. Reduced
+motion leaves the indicator static and disables fades. The shared screen fades
+in and out over 180ms; navigation itself is never delayed. A per-tab boolean
+carries the screen into the destination so it can fade out when the DOM and deferred
+scripts are ready. Remote maps and images never hold the entire page behind it.
 
-Home's recent ticket list previews the first three recorded violations and appends `...` when more exist. Supporting details show the driver name, labeled registered owner address, plate, and total fine. Missing owner addresses display `Not recorded`. Text wraps within the details column while status and date keep their own space. Complete violations remain available through Review tickets.
+Attendance history is owned by `components.attendance-history-table`. Schedule
+editing is owned by `supervisor.attendance` and `.attendance-restriction-modal`.
+Native time and select controls retain platform-owned popups. Dialog validation
+shows text errors, retains entered values, and focuses feedback. Escape and Cancel
+close the dialog and return focus to its trigger. Existing semantic controls and
+focus styles remain canonical. No new animation is introduced.
 
-Complete ticket details reuse `dashboard.violation-ticket-show` and the shared dashboard CSS. Observed and document plates have separate labels; registered owners have their own card apart from driver identity. Evidence photos appear in their submitted order, with numbered captions. Historical enforcer signatures use the ticket snapshot. Registration values wrap fully at desktop and narrow widths; no missing document data is inferred.
-
-Citation summaries show section numbers only when a section is recorded; omit the section line for form-only citations.
-
-Analytics Reports uses four compact summary cards, the existing red/blue activity chart, and overlapping vehicle circles as its signature. Period, View, and Chart type belong inside Performance Overview. Violation rankings use a semantic table with horizontal scrolling on narrow screens. The three vehicle circles show the leading types, with full labels and counts repeated below them and an explicit remainder for other or unrecorded types.
-
-The shared shell and tokens remain owned by `public/css/dashboard.css`; `public/css/analytics-reports.css` supplies report layout variants using its canvas, panel, text, muted, border, and accent variables. Chart series retain the existing Analytics palette. Report controls accept native select popups and their keyboard behavior.
+Authentication uses `components.auth-layout` and `components.auth-field`, with
+styles scoped to `.auth-split-page` in `auth.css`. Login, administrator sign-up,
+forgot password, and reset password share the same split-screen layout with an
+opaque white form panel and the existing red primary action. Below 860px, the
+photo panel yields to a single form column. The showcase uses a photo-backed variant: a smaller headline,
+one short description, and the existing office footer over the supplied office
+photo (`public/images/auth-office.png`). A 60% navy overlay (`--auth-photo-overlay`
+in the shared auth showcase) keeps the white text readable without fading the content;
+the photo fills the left panel with a centered cover crop.
+Dashboard previews and decorative status dots are omitted across these screens.
+Registration retains a compact two-column field grid on phones. At the
+user's request, auth screens are locked to the dynamic viewport with no
+document or panel scrolling. Compact controls and spacing fit ordinary laptop
+and phone heights; the shared auth script scales the complete form only when
+needed for short viewports or expanded validation feedback, keeping all actions
+visible.
+The system sans face serves form text; a heavier, tightly spaced display treatment
+uses the same face for the showcase headline. Shared tokens map `typography.sans`
+to `--font-sans`, `rounded.control` to `--radius-control`, and `rounded.surface`
+to `--radius-surface`. Authentication hover/active and focus treatments live in
+the scoped auth stylesheet. Password recovery reuses the shared fields, inline
+validation, password visibility controls, and busy feedback.
 
 ## Do's and Don'ts
 
-The cashier overview reuses the shared dashboard shell, `.users-table`, status
-badges, and pagination. It is a read-only variant with a single Ticket overview
-navigation item and no Actions column. Ticket IDs remain the red record anchor
-but are plain text because this role has no ticket-detail access. Full motorist,
-plate, and violation values wrap; the table owns horizontal overflow on narrow
-screens. `public/css/cashier-dashboard.css` owns only this variant's geometry
-and consumes `--panel`, `--soft`, `--line`, `--text`, `--muted`, and `--accent`
-from the canonical `public/css/dashboard.css` palette without changing tokens.
+Supervisor Home uses three compact summary cards above an area-distribution
+register and quick actions, followed by a paginated team directory. Coverage bars
+describe assigned members rather than live presence. `supervisor-home.css` owns
+this scoped variant and consumes the shared theme tokens; its red accent, system
+type, borders, and spacing follow administrator Home. At phone widths summary
+cards become compact rows and panels stack; the directory owns horizontal scroll.
 
-Do preserve exact record values and readable status text. Do not hide primary actions behind row-wide click handlers or use modals for complete tickets.
+The administrator Home uses four compact metric cards, a seven-day bar chart
+beside quick actions, and a recent-ticket table. The latest day carries the red
+chart accent; earlier bars use a pale version of that same accent. Keep fine
+amounts above small tinted status labels, without dots. `home-dashboard.css`
+owns this page variant and consumes the canonical theme tokens directly.
 
-Analytics uses one URL-backed range control (Today, Week, Month, Year, All) for cards, chart, vehicle trends, and violation rankings. Today uses Manila midnight, Week starts Monday, Month and Year start at calendar boundaries; ranges end at the current time. The chart has no separate Period selector. Existing View and Chart type selections persist across range changes.
-
-My Profile uses a compact identity card with a round photo, calm personal-information and password cards, and a read-only account sidebar. The shared photo editor provides a preview, upload/change/remove buttons, and pending-save feedback. Existing account settings and permissions remain unchanged.
-
-User creation and editing reuse the shared photo editor within a compact horizontal identity strip. Section headings use simple ruled dividers, quieter required/optional labels, and a responsive two-column field layout. The form retains existing role, team, and validation behavior.
-
-Staff profile views for enforcers, supervisors, and admins reuse the create/edit account layout in `public/css/user-editor.css`. A circular photo and role/status badges sit beside the account identity. Personal, contact, and account sections use the same ruled headings and two-column spacing, with semantic read-only values on quiet surfaces. Missing values are explicit; enforcer assignment links and existing edit/back routes remain available. Narrow screens stack the identity and details.
-
-Area Assignment uses a stable full-width search field with an explicit clear button, an area filter, and a primary Add area action. The compact table uses bounded assignment dropdowns, quieter area badges, and accessible per-enforcer save buttons. Native select behavior and existing assignment permissions remain unchanged.
-
-Attendance history reuses `components.attendance-history-table` for enforcers and supervisors. Date and weekday share a cell; map links sit beneath their matching timestamps. The table scrolls inside its card on narrow screens. Admins have visible Edit and Delete buttons in one Actions column, opening the shared attendance dialogs outside the scroll region. Dialogs reuse the attendance restriction surface and footer styles.
-
-Location Monitoring uses the approved Map First layout: a full-width map beneath a compact status strip, a floating collapsible officer roster, and a non-modal selected-officer card at the lower right. Narrow screens collapse the roster when selecting an officer and restore it on closing details. Team, area, and status filters remain native selects with platform-owned popups. `public/css/location-monitoring.css` owns only this layout and consumes the canonical dashboard `--bg`, `--panel`, `--text`, `--muted`, `--line`, `--line-strong`, `--active`, and `--accent` tokens. The runtime palette remains owned by `public/css/dashboard.css`; no global palette change is introduced. Officer photos and initials reuse `.location-avatar`. Map controls remain owned by Google Maps. Location age and GPS accuracy have separate labels; off-duty and offline counts remain distinct.
+Use one daily schedule for new enforcer attendance. Keep historical morning and
+afternoon labels truthful. Do not relabel old records, invent missing timestamps,
+or introduce a second daily clock-in through the afternoon schedule.

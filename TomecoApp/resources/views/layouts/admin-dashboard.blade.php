@@ -11,6 +11,7 @@
 </head>
 
 <body>
+    <x-page-loader />
     @php
         $user = auth()->user();
         $initials = collect(explode(' ', $user->fullName ?: 'User'))
@@ -42,13 +43,7 @@
             @elseif ($user->isCashier())
                 <span class="section-label">Cashier workspace</span>
             @else
-                <div class="search">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="11" cy="11" r="7" />
-                        <path d="m20 20-3.5-3.5" />
-                    </svg>
-                    <input type="search" placeholder="Search dashboard" aria-label="Search dashboard">
-                </div>
+                <x-dashboard-search />
             @endif
 
             <div class="topbar-spacer"></div>
@@ -115,24 +110,20 @@
                         </div>
                     </details>
                   
-                    <details class="nav-dropdown" @if ($activePage === 'attendance') open @endif>
-                        <summary class="nav-item {{ $activePage === 'attendance' ? 'is-active' : '' }}">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
-                            <span class="nav-text">Attendance</span><span class="nav-dropdown-arrow">&rsaquo;</span>
-                        </summary>
-                        <div class="nav-submenu">
-                            <a class="nav-subitem {{ request('type', 'supervisor') === 'supervisor' ? 'is-active' : '' }}" href="{{ route('dashboard.attendance', ['type' => 'supervisor']) }}">Supervisors</a>
-                            <a class="nav-subitem {{ request('type') === 'enforcer' ? 'is-active' : '' }}" href="{{ route('dashboard.attendance', ['type' => 'enforcer']) }}">Enforcers</a>
-                        </div>
-                    </details>
+                    <a class="nav-item {{ $activePage === 'attendance' ? 'is-active' : '' }}" href="{{ route('dashboard.attendance') }}">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
+                        <span class="nav-text">Attendance</span>
+                    </a>
                       <a class="nav-item {{ $activePage === 'area-assignments' ? 'is-active' : '' }}" href="{{ route('area-assignments.index') }}">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 20h16M6 17V7l6-4 6 4v10" /><path d="M9 10h6M9 14h6" /></svg>
                         <span class="nav-text">Area Assignments</span>
                     </a>
-                    <a class="nav-item {{ $activePage === 'audit-logs' ? 'is-active' : '' }}" href="{{ route('dashboard.audit-logs') }}">
+                    @if ($user->isAdmin())
+                    <a class="nav-item {{ $activePage === 'audit-logs' ? 'is-active' : '' }}" href="{{ route('dashboard.audit-logs') }}" @if ($activePage === 'audit-logs') aria-current="page" @endif>
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M6 3h9l3 3v15H6z"/><path d="M9 10h6M9 14h6M9 18h4M14 3v4h4"/></svg>
                         <span class="nav-text">Audit Log</span>
                     </a>
+                    @endif
                 </nav>
                 @endif
             </div>

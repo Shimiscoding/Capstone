@@ -29,7 +29,9 @@ class AuthController extends Controller
     {
         abort_unless($settings->get('security.admin_signup_enabled', true), 404);
 
-        return view('auth.register');
+        return view('auth.register', [
+            'passwordMinLength' => (int) $settings->get('security.password_min_length', 8),
+        ]);
     }
 
     public function showForgotPassword(): View
@@ -53,6 +55,7 @@ class AuthController extends Controller
         return view('auth.reset-password', [
             'token' => $token,
             'email' => $request->string('email')->toString(),
+            'passwordMinLength' => (int) app(Settings::class)->get('security.password_min_length', 8),
         ]);
     }
 

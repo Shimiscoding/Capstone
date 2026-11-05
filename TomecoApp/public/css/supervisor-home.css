@@ -1,0 +1,79 @@
+.supervisor-topbar-label{color:var(--muted);font-size:12px;font-weight:600}
+.supervisor-home{font-family:var(--font-sans);max-width:1800px}
+.supervisor-home svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.supervisor-home .supervisor-home-heading{border:0;padding-bottom:0;margin-bottom:25px;gap:20px}
+.supervisor-home-heading h1{font-size:28px;letter-spacing:-.035em;color:var(--text)}
+.supervisor-home-heading .eyebrow{margin:0 0 8px;font-size:9px}
+.supervisor-home-heading .page-description{margin:0;font-size:12px}
+.supervisor-home-date{text-align:right;flex-shrink:0;font-size:12px}
+.supervisor-home-date strong{font-weight:600}
+.supervisor-home-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-bottom:22px}
+.supervisor-home-stat{display:flex;min-width:0;flex-direction:column;gap:14px;padding:19px 21px;border:1px solid var(--line);border-radius:var(--radius-surface);background:var(--panel);text-decoration:none;color:var(--text)}
+.supervisor-home-stat>span{display:flex;align-items:center;justify-content:space-between;gap:10px;color:var(--muted);font-size:12px;font-weight:500}
+.supervisor-home-stat>strong{font-size:34px;line-height:1;font-weight:650;letter-spacing:-.045em;font-variant-numeric:tabular-nums}
+.supervisor-home-stat small{display:flex;align-items:center;justify-content:space-between;gap:8px;color:var(--muted);font-size:10px;line-height:1.5}
+.supervisor-home-stat small span{font-size:15px}
+.supervisor-home-stat.is-primary{border-top:3px solid var(--accent);padding-top:17px}
+.supervisor-home-stat.is-primary>strong,.supervisor-home-stat.is-primary svg{color:var(--accent)}
+.supervisor-home a{cursor:pointer}
+.supervisor-home-stat:hover{background:var(--soft);border-color:var(--line-strong)}
+.supervisor-home-stat.is-primary:hover{border-top-color:var(--accent)}
+.supervisor-home a:active{opacity:.8}
+.supervisor-home a:focus-visible,.supervisor-home [tabindex="0"]:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.supervisor-home-middle{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(275px,1fr);gap:20px;align-items:stretch;margin-bottom:22px}
+.supervisor-home-panel{min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius-surface);overflow:hidden}
+.supervisor-home-panel-head{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:20px 22px 17px}
+.supervisor-home-panel h2{margin:0;color:var(--text);font-size:14px;font-weight:650;letter-spacing:-.015em}
+.supervisor-home-panel-head p{margin:5px 0 0;color:var(--muted);font-size:11px;line-height:1.5}
+.supervisor-home-link{display:inline-flex;align-items:center;gap:8px;color:var(--accent);font-size:11px;font-weight:600;text-decoration:none;white-space:nowrap}
+.supervisor-home-link:hover{text-decoration:underline;text-underline-offset:3px}
+.supervisor-coverage-list{list-style:none;margin:0;padding:0 22px}
+.supervisor-coverage-list li+li{border-top:1px solid var(--line)}
+.supervisor-coverage-list a{display:grid;grid-template-columns:minmax(90px,1fr) minmax(60px,1.1fr) 85px;align-items:center;gap:18px;padding:15px 0;text-decoration:none;color:var(--text);font-size:12px}
+.supervisor-coverage-list a:hover .supervisor-coverage-name{color:var(--accent);text-decoration:underline}
+.supervisor-coverage-name{overflow-wrap:anywhere;line-height:1.5}
+.supervisor-coverage-track{height:6px;background:var(--active);border-radius:20px;overflow:hidden}
+.supervisor-coverage-track>span{display:block;height:100%;background:var(--accent);border-radius:inherit;opacity:.7}
+.supervisor-coverage-list strong{text-align:right;font-size:12px;font-weight:600;font-variant-numeric:tabular-nums}
+.supervisor-coverage-list strong span{font-size:10px;font-weight:400;color:var(--muted)}
+.supervisor-coverage-note{font-size:10px;color:var(--muted);line-height:1.65;margin:10px 22px 19px;max-width:480px}
+.supervisor-home-actions .supervisor-home-panel-head{padding-bottom:6px}
+.supervisor-home-actions>a{display:flex;align-items:center;gap:12px;margin:0 21px;padding:16px 0;text-decoration:none;color:var(--text);border-bottom:1px solid var(--line)}
+.supervisor-home-actions>a:last-child{border-bottom:0;margin-bottom:5px}
+.supervisor-home-actions>a:hover strong{color:var(--accent)}
+.supervisor-home-actions>a:hover .supervisor-action-icon{border-color:var(--line-strong);color:var(--accent)}
+.supervisor-action-icon{display:grid;place-items:center;width:36px;height:36px;flex-shrink:0;border:1px solid var(--line);background:var(--soft);color:var(--muted);border-radius:var(--radius-control)}
+.supervisor-home-actions>a>span:nth-child(2){flex:1;min-width:0}
+.supervisor-home-actions strong{display:block;font-size:12px;font-weight:600}
+.supervisor-home-actions small{display:block;margin-top:4px;font-size:10px;color:var(--muted);line-height:1.5}
+.supervisor-home-actions>a>span:last-child{font-size:17px;color:var(--muted)}
+.supervisor-roster-count{display:inline-block;padding:3px 7px;margin-left:6px;background:var(--active);border-radius:4px;color:var(--muted);font-size:10px;vertical-align:middle}
+.supervisor-home .supervisor-roster-table{min-width:780px;width:100%;table-layout:auto}
+.supervisor-roster .table-scroll{position:relative}
+.supervisor-home .supervisor-roster-table :is(th,td){padding:13px 22px;width:auto}
+.supervisor-home .supervisor-roster-table th{border-top:1px solid var(--line);font-size:9px;letter-spacing:.055em;font-weight:600;background:var(--soft)}
+.supervisor-home .supervisor-roster-table td{font-size:12px;vertical-align:middle}
+.supervisor-roster-table .user-cell{min-width:175px;gap:10px}
+.supervisor-roster-table .user-cell strong{font-size:12px;font-weight:600;overflow-wrap:anywhere;white-space:normal}
+.supervisor-roster-table .user-cell small,.supervisor-roster-contact small,.supervisor-roster-area small{display:block;margin-top:4px;font-size:10px;color:var(--muted)}
+.supervisor-roster-table .table-avatar{width:34px;height:34px;background:var(--active);color:var(--muted);font-size:11px}
+.supervisor-roster-contact{max-width:260px;overflow-wrap:anywhere}
+.supervisor-roster-area{max-width:210px;overflow-wrap:anywhere}
+.supervisor-area-pending{color:var(--muted);font-style:italic}
+.supervisor-account-status{display:inline-block;padding:4px 8px;border:1px solid var(--line);border-radius:4px;color:var(--muted);font-size:10px;background:var(--soft)}
+.supervisor-account-status.is-active{color:color-mix(in srgb,var(--green) 75%,var(--text));border-color:color-mix(in srgb,var(--green) 20%,var(--panel));background:color-mix(in srgb,var(--green) 6%,var(--panel))}
+.supervisor-home .table-footer{padding:14px 22px;font-size:10px;gap:12px;color:var(--muted)}
+.supervisor-home .pagination-actions{align-items:center;gap:8px}
+.supervisor-home .page-button{font-size:10px;min-height:30px;padding:7px 10px}
+.supervisor-home .page-button.is-disabled{pointer-events:none;background:var(--soft)}
+.supervisor-page-number{font-size:10px;white-space:nowrap}
+.supervisor-home-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px 22px;min-height:190px;text-align:center;gap:10px}
+.supervisor-home-empty>strong{font-size:13px;font-weight:600}
+.supervisor-home-empty>p{font-size:11px;color:var(--muted);line-height:1.65;max-width:300px;margin:0}
+.supervisor-empty-icon{display:grid;place-items:center;width:37px;height:37px;margin-bottom:2px;background:var(--soft);border:1px solid var(--line);border-radius:var(--radius-control);color:var(--muted)}
+.supervisor-home-button{display:inline-flex;align-items:center;justify-content:center;gap:12px;background:var(--accent);border-radius:var(--radius-control);padding:10px 13px;color:var(--panel);text-decoration:none;font-size:11px;font-weight:600;margin-top:5px}
+.supervisor-home-button:hover{background:color-mix(in srgb,var(--accent) 90%,var(--text))}
+@media(min-width:1500px){.supervisor-home{padding:32px 40px}}
+@media(max-width:1100px){.supervisor-home-middle{grid-template-columns:minmax(0,1fr)}.supervisor-home-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}.supervisor-home-actions .supervisor-home-panel-head{grid-column:1/-1;padding-bottom:8px}.supervisor-home-actions>a{margin:0;padding:16px;align-items:flex-start;border-bottom:0}.supervisor-home-actions>a:last-child{margin-bottom:0}.supervisor-home-actions>a>span:last-child{display:none}.supervisor-home-stat{padding:17px}.supervisor-home-stat.is-primary{padding-top:15px}}
+@media(max-width:760px){.supervisor-home .supervisor-home-heading{align-items:flex-start;flex-direction:column;gap:12px}.supervisor-home-date{text-align:left;font-size:11px}.supervisor-home-heading h1{font-size:25px}.supervisor-home-stats{gap:10px}.supervisor-home-stat{padding:14px 12px;gap:13px}.supervisor-home-stat.is-primary{padding-top:12px}.supervisor-home-stat>span{font-size:11px;line-height:1.5;min-height:33px}.supervisor-home-stat>span svg{display:none}.supervisor-home-stat>strong{font-size:29px}.supervisor-home-stat small{font-size:9px}.supervisor-home-stat small span{display:none}.supervisor-home-panel-head{padding:17px 16px;gap:12px;flex-wrap:wrap}.supervisor-coverage-list{padding:0 16px}.supervisor-coverage-note{margin-left:16px;margin-right:16px}.supervisor-home-actions{display:block}.supervisor-home-actions>a{margin:0 16px;padding:14px 0;border-bottom:1px solid var(--line)}.supervisor-home-actions>a:last-child{margin-bottom:2px}.supervisor-home-actions>a>span:last-child{display:block}.supervisor-home .table-footer{padding:14px 16px}.supervisor-home .supervisor-roster-table :is(th,td){padding:12px 16px}.supervisor-home-stats,.supervisor-home-middle{margin-bottom:16px}}
+@media(max-width:420px){.supervisor-home-stats{grid-template-columns:1fr}.supervisor-home-stat{display:grid;grid-template-columns:1fr auto;gap:5px 12px;padding:14px 16px}.supervisor-home-stat.is-primary{padding-top:12px}.supervisor-home-stat>span{min-height:0}.supervisor-home-stat>strong{grid-column:2;grid-row:1/3;align-self:center;font-size:30px}.supervisor-home-stat small{grid-column:1;font-size:10px}.supervisor-home-stat>span{font-size:12px}.supervisor-coverage-list a{grid-template-columns:minmax(0,1fr) 60px 70px;gap:12px}.supervisor-coverage-list strong span{font-size:9px}.supervisor-home-link{font-size:10px}.supervisor-topbar-label{display:none}}

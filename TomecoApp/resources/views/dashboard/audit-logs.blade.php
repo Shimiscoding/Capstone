@@ -24,18 +24,20 @@
     @endphp
     <div class="page-head users-page-head">
         <div>
-            <p class="eyebrow">Website activity</p>
+            <p class="eyebrow">Administrator activity review</p>
             <h1>Audit Log</h1>
-            <p class="page-description">Review important changes made through the website.</p>
+            <p class="page-description">Review recorded events across the website and mobile app. Filter by the role of the person who performed the action.</p>
         </div>
         <div class="user-count">{{ number_format($logs->total()) }} {{ \Illuminate\Support\Str::plural('entry', $logs->total()) }}</div>
     </div>
 
-    <form class="user-table-filters users-reference-toolbar audit-log-toolbar" method="GET" action="{{ route('dashboard.audit-logs') }}">
+    <form class="user-table-filters users-reference-toolbar audit-log-toolbar" method="GET" action="{{ route('dashboard.audit-logs') }}" role="search" novalidate>
         <div class="users-toolbar-main"><div class="users-toolbar-actions">
-            <label class="toolbar-search"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5"/><path d="m12.2 12.2 4 4"/></svg><span class="sr-only">Search audit log</span><input type="search" name="search" value="{{ $search }}" placeholder="Search user or record"></label>
+            <label class="toolbar-search"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5"/><path d="m12.2 12.2 4 4"/></svg><span class="sr-only">Search audit log</span><input type="search" name="search" value="{{ $search }}" placeholder="Search user or record"><button type="button" data-clear-audit-search aria-label="Clear audit log search" @if ($search === '') hidden @endif>&times;</button></label>
+            <label class="audit-event-filter"><span class="sr-only">Filter by actor role</span><select name="actor_role" onchange="this.form.submit()"><option value="">All roles</option>@foreach (\App\Models\User::ROLES as $role)<option value="{{ $role }}" @selected($actorRole === $role)>{{ $role === \App\Models\User::ROLE_OFFICER ? 'Enforcer' : ucfirst($role) }}</option>@endforeach</select></label>
             <label class="audit-event-filter"><span class="sr-only">Filter by activity</span><select name="event" onchange="this.form.submit()"><option value="">All activity</option><option value="created" @selected($event === 'created')>Created</option><option value="updated" @selected($event === 'updated')>Updated</option><option value="deleted" @selected($event === 'deleted')>Deleted</option></select></label>
             <button class="toolbar-outline-button" type="submit">Search</button>
+            @if ($search !== '' || $event !== '' || $actorRole !== '')<a class="toolbar-outline-button" href="{{ route('dashboard.audit-logs') }}">Reset filters</a>@endif
         </div></div>
     </form>
 
@@ -45,6 +47,14 @@
                 <thead><tr><th>Date and time</th><th>Changed by</th><th>Activity</th><th>What they did</th><th>Record</th></tr></thead>
                 <tbody>
                 @forelse ($logs as $log)
+                    @php
+                        $snapshotKey = match ($log->event) { 'created' => 'new', 'deleted' => 'old', default => null };
+                        $visibleChanges = collect($log->changes ?? [])->filter(static function ($change) use ($snapshotKey): bool {
+                            if ($snapshotKey === null) return true;
+                            $value = $change[$snapshotKey] ?? null;
+                            return $value !== null && $value !== '' && $value !== [];
+                        });
+                    @endphp
                     <tr>
                         <td><time datetime="{{ $log->created_at->toIso8601String() }}"><strong>{{ $log->created_at->format('M d, Y') }}</strong><small>{{ $log->created_at->format('h:i:s A') }}</small></time></td>
                         <td><div class="audit-actor"><div class="audit-actor-name"><strong>{{ $log->actor_name ?: $log->user?->fullName ?: 'System' }}</strong>@if ($log->actor_role)<span class="role-badge">{{ $log->actor_role === \App\Models\User::ROLE_OFFICER ? 'Enforcer' : ucfirst($log->actor_role) }}</span>@endif</div><small>{{ $log->user?->email ?: 'Automated or archived account' }}</small></div></td>
@@ -56,15 +66,17 @@
                             @else
                                 <small>{{ $log->subject_label }}</small>
                             @endif
-                            @if (count($log->changes ?? []) > 0)
+                            @if ($visibleChanges->isNotEmpty())
                                 <details class="audit-change-details">
-                                    <summary>View {{ count($log->changes) }} {{ \Illuminate\Support\Str::plural('change', count($log->changes)) }}</summary>
-                                    <div class="audit-change-list">
-                                        @foreach ($log->changes as $field => $change)
+                                    <summary>View {{ $visibleChanges->count() }} {{ \Illuminate\Support\Str::plural($snapshotKey === null ? 'change' : 'recorded field', $visibleChanges->count()) }}</summary>
+                                    <div class="audit-change-list {{ $snapshotKey !== null ? 'is-snapshot' : '' }}">
+                                        @foreach ($visibleChanges as $field => $change)
                                             <div>
                                                 <strong>{{ $fieldLabel($field) }}</strong>
                                                 @if ($field === 'signature')
                                                     <span class="audit-new-value">Signature {{ $log->event === 'deleted' ? 'removed' : 'recorded' }}</span>
+                                                @elseif ($snapshotKey !== null)
+                                                    <span class="{{ $log->event === 'deleted' ? 'audit-old-value' : 'audit-new-value' }}">{{ $displayValue($change[$snapshotKey]) }}</span>
                                                 @else
                                                     <span class="audit-old-value">{{ $displayValue($change['old'] ?? null) }}</span>
                                                     <i aria-hidden="true">&rarr;</i>
@@ -79,7 +91,7 @@
                         <td><strong>{{ $log->subject_label ?: class_basename($log->auditable_type).' #'.$log->auditable_id }}</strong><small>{{ class_basename($log->auditable_type) }}</small></td>
                     </tr>
                 @empty
-                    <tr><td colspan="5" class="empty-state"><strong>No website activity found</strong><span>Important website changes will appear here.</span></td></tr>
+                    <tr><td colspan="5" class="empty-state"><strong>No activity found</strong><span>{{ $search !== '' || $event !== '' || $actorRole !== '' ? 'Try another search or reset the filters to see more events.' : 'Recorded changes will appear here as people use the website and mobile app.' }}</span></td></tr>
                 @endforelse
                 </tbody>
             </table>
@@ -104,3 +116,7 @@
         @endif
     </section>
 @endsection
+
+@push('scripts')
+    <script src="{{ asset('js/audit-logs.js') }}?v={{ filemtime(public_path('js/audit-logs.js')) }}" defer></script>
+@endpush

@@ -7,6 +7,7 @@ use App\Models\EnforcerAttendance;
 use App\Models\OfficerLocation;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Vite;
 use Illuminate\Support\Facades\Event;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -14,6 +15,21 @@ use Tests\TestCase;
 class OfficerLocationMonitoringTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_monitoring_page_renders_for_both_viewer_roles_with_built_assets(): void
+    {
+        app(Vite::class)->useHotFile(storage_path('framework/testing-location-monitoring.hot'));
+
+        foreach ([User::ROLE_ADMIN, User::ROLE_SUPERVISOR] as $role) {
+            $viewer = User::factory()->create(['role' => $role]);
+
+            $this->actingAs($viewer)->get(route('location-monitoring.index'))
+                ->assertOk()
+                ->assertSee('Location Monitoring')
+                ->assertSee('/build/assets/location-monitoring-', false)
+                ->assertDontSee('@vite/client', false);
+        }
+    }
 
     public function test_timed_in_officer_can_update_one_current_location_and_throttled_history(): void
     {

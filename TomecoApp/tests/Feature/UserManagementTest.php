@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\EnforcerAttendance;
 use App\Models\SupervisorAttendance;
 use App\Models\User;
 use App\Notifications\UserActivityNotification;
@@ -507,16 +508,17 @@ class UserManagementTest extends TestCase
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
         $supervisor = User::factory()->create(['role' => User::ROLE_SUPERVISOR]);
 
-        $this->actingAs($admin)->get(route('dashboard.attendance'))->assertOk()->assertSee('Supervisor Attendance');
+        $this->actingAs($admin)->get(route('dashboard.attendance'))->assertOk()->assertSee('Enforcer Attendance');
         $this->actingAs($supervisor)->get(route('dashboard.attendance'))->assertForbidden();
     }
 
-    public function test_attendance_page_lists_each_supervisor_only_once(): void
+    public function test_attendance_page_lists_each_enforcer_only_once(): void
     {
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
-        $supervisor = User::factory()->create(['role' => User::ROLE_SUPERVISOR, 'fullName' => 'Unique Attendance User']);
-        SupervisorAttendance::create(['user_id' => $supervisor->id, 'attendance_date' => today()->subDay(), 'time_in' => now()->subDay()]);
-        SupervisorAttendance::create(['user_id' => $supervisor->id, 'attendance_date' => today(), 'time_in' => now()]);
+        $supervisor = User::factory()->create(['role' => User::ROLE_SUPERVISOR]);
+        $enforcer = User::factory()->create(['role' => User::ROLE_OFFICER, 'supervisor_id' => $supervisor->id, 'fullName' => 'Unique Attendance User']);
+        EnforcerAttendance::create(['user_id' => $enforcer->id, 'supervisor_id' => $supervisor->id, 'attendance_date' => today()->subDay(), 'time_in' => now()->subDay()]);
+        EnforcerAttendance::create(['user_id' => $enforcer->id, 'supervisor_id' => $supervisor->id, 'attendance_date' => today(), 'time_in' => now()]);
 
         $this->actingAs($admin)
             ->get(route('dashboard.attendance'))

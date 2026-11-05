@@ -1,44 +1,18 @@
-<!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+<x-auth-layout title="Forgot password" page="forgot-password">
+    <p class="auth-page-label">Password recovery</p>
+    <h1 id="auth-heading" class="auth-title">Forgot your password?</h1>
+    <p class="auth-description">Enter your registered email address and we'll send you a password reset link.</p>
 
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Forgot password</title>
-    <link rel="stylesheet" href="{{ asset('css/auth.css') }}">
-    <link rel="icon" href="{{ asset('images/favicon.ico') }}">
-</head>
+    @if (session('status'))
+        <p class="auth-status" role="status">{{ session('status') }}</p>
+    @endif
 
-<body class="auth-page login-page">
-    <main class="auth-shell">
-        <section class="auth-card">
-            <div class="auth-brand auth-brand-with-logo">
-                <img src="{{ asset('images/Tomeco_icon.jpg') }}" alt="TOMECO official seal">
-                <span><strong>TOMECO</strong><small>Traffic Operation Management Enforcement and Control Office
-                        Tacloban</small></span>
-            </div>
-            <h1 class="auth-title">Forgot your password?</h1>
+    <form method="POST" action="{{ route('password.email') }}" class="auth-form" data-auth-form novalidate>
+        @csrf
+        <x-auth-field name="email" label="Email" type="email" autocomplete="email" placeholder="you@example.com" required autofocus maxlength="255" />
+        <p class="auth-form-status sr-only" role="status" aria-live="polite"></p>
+        <button type="submit" class="auth-button" data-busy-label="Sending reset link…">Email password reset link</button>
+    </form>
 
-            @if (session('status'))
-                <p class="auth-status" role="status">{{ session('status') }}</p>
-            @endif
-
-            <form method="POST" action="{{ route('password.email') }}" class="auth-form">
-                @csrf
-                <div>
-                    <label for="email" class="auth-label">Email</label>
-                    <input id="email" name="email" type="email" value="{{ old('email') }}" autocomplete="email"
-                        required autofocus class="auth-input">
-                    @error('email')
-                        <p class="auth-error">{{ $message }}</p>
-                    @enderror
-                </div>
-                <button type="submit" class="auth-button">Email password reset link</button>
-            </form>
-
-            <p class="auth-note"><a href="{{ route('login') }}" class="auth-link">Back to login</a></p>
-        </section>
-    </main>
-</body>
-
-</html>
+    <p class="auth-note"><a href="{{ route('login') }}" class="auth-link">Back to login</a></p>
+</x-auth-layout>

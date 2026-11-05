@@ -11,6 +11,7 @@
 </head>
 
 <body>
+    <x-page-loader />
     @php
         $user = auth()->user();
         $initials = collect(explode(' ', $user->fullName ?: 'User'))
@@ -24,7 +25,7 @@
     <div class="app-frame">
         <header class="topbar">
             <div class="brand-switcher">
-                <img class="brand-logo" src="{{ asset('images/favicon.ico') }}" alt="TOMECO logo">
+                <img class="brand-logo" src="{{ asset('images/Tomeco_icon.jpg') }}" alt="TOMECO logo">
                 <div class="brand-title"><strong>TOMECO</strong><span>Traffic Operations</span></div>
                 <button class="plain-button sidebar-toggle" id="sidebarToggle" type="button" aria-label="Hide sidebar"
                     aria-controls="dashboardSidebar" aria-expanded="true">
@@ -40,13 +41,7 @@
             @hasSection('headerSearch')
                 @yield('headerSearch')
             @else
-                <div class="search">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="11" cy="11" r="7" />
-                        <path d="m20 20-3.5-3.5" />
-                    </svg>
-                    <input type="search" placeholder="Search dashboard" aria-label="Search dashboard">
-                </div>
+                <x-dashboard-search />
             @endif
 
             <div class="topbar-spacer"></div>

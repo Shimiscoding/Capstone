@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Setting;
 use App\Models\User;
+use App\Services\Settings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -18,11 +19,16 @@ class SettingsTest extends TestCase
         $this->actingAs($admin)->get(route('dashboard.settings'))->assertOk()->assertSee('System Settings');
         $this->actingAs($admin)->put(route('dashboard.settings.update'), [
             'section' => 'general', 'organization_name' => 'TOMECO Legazpi', 'address' => 'City Hall',
-            'phone' => '09123456789', 'email' => 'admin@example.com', 'timezone' => 'Asia/Manila',
+            'phone' => '09123456789', 'email' => 'admin@example.com', 'timezone' => 'UTC',
             'date_format' => 'Y-m-d', 'violation_prefix' => 'VIO-',
         ])->assertRedirect(route('dashboard.settings', ['tab' => 'general']));
 
         $this->assertEquals('TOMECO Legazpi', Setting::where('key', 'general.organization_name')->value('value'));
+
+        $this->get(route('dashboard.settings'))
+            ->assertOk()
+            ->assertSee('value="UTC" selected', false)
+            ->assertSee('value="Y-m-d" selected', false);
     }
 
     public function test_non_admin_cannot_access_settings(): void
@@ -30,27 +36,64 @@ class SettingsTest extends TestCase
         $officer = User::factory()->create(['role' => User::ROLE_OFFICER]);
 
         $this->actingAs($officer)->get(route('dashboard.settings'))->assertForbidden();
+        $this->put(route('dashboard.settings.update'), ['section' => 'general'])->assertForbidden();
     }
 
-    public function test_roles_and_permissions_only_show_administrator_and_supervisor(): void
+    public function test_removed_settings_sections_are_absent_and_old_links_show_general(): void
     {
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
 
-        $this->actingAs($admin)
-            ->get(route('dashboard.settings', ['tab' => 'permissions']))
-            ->assertOk()
-            ->assertSeeText('Administrator')
-            ->assertSeeText('Supervisor')
-            ->assertDontSeeText('Officer');
+        foreach (['general', 'notifications', 'security', 'violations', 'permissions', 'data', 'unknown'] as $tab) {
+            $response = $this->actingAs($admin)->get(route('dashboard.settings', ['tab' => $tab]))
+                ->assertOk()
+                ->assertSeeText('General')
+                ->assertSeeText('Notifications')
+                ->assertSeeText('Security')
+                ->assertDontSeeText('Violations & Fines')
+                ->assertDontSeeText('Roles & Permissions')
+                ->assertDontSeeText('Import & Export')
+                ->assertDontSee('name="catalog_text"', false)
+                ->assertDontSee('name="supervisor[]"', false)
+                ->assertDontSee('name="default_format"', false);
+
+            if (in_array($tab, ['violations', 'permissions', 'data', 'unknown'], true)) {
+                $response->assertSee('name="section" value="general"', false);
+            }
+        }
+    }
+
+    public function test_removed_settings_sections_cannot_be_updated(): void
+    {
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $settings = app(Settings::class);
+        $original = $settings->all();
+
+        foreach ([
+            ['section' => 'violations', 'late_fee' => 999, 'catalog_text' => 'Changed | 999'],
+            ['section' => 'permissions', 'admin' => [], 'supervisor' => ['manage_settings']],
+            ['section' => 'data', 'max_upload_mb' => 20, 'duplicate_behavior' => 'skip', 'default_format' => 'csv', 'history_days' => 1],
+        ] as $payload) {
+            $this->actingAs($admin)->putJson(route('dashboard.settings.update'), $payload)
+                ->assertUnprocessable()
+                ->assertJsonValidationErrors('section');
+        }
+
+        $this->assertSame($original, $settings->all());
+        $this->assertDatabaseCount('settings', 0);
+    }
+
+    public function test_admin_can_update_notification_settings(): void
+    {
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
 
         $this->actingAs($admin)->put(route('dashboard.settings.update'), [
-            'section' => 'permissions',
-            'admin' => ['manage_settings', 'manage_users'],
-            'supervisor' => ['record_violations', 'export'],
-        ])->assertRedirect(route('dashboard.settings', ['tab' => 'permissions']));
+            'section' => 'notifications', 'new_violation' => '1', 'recipient_email' => 'alerts@example.com',
+        ])->assertRedirect(route('dashboard.settings', ['tab' => 'notifications']));
 
-        $this->assertDatabaseHas('settings', ['key' => 'permissions.supervisor']);
-        $this->assertDatabaseMissing('settings', ['key' => 'permissions.officer']);
+        $settings = app(Settings::class);
+        $this->assertTrue($settings->get('notifications.new_violation'));
+        $this->assertFalse($settings->get('notifications.overdue_reminder'));
+        $this->assertSame('alerts@example.com', $settings->get('notifications.recipient_email'));
     }
 
     public function test_admin_can_disable_public_admin_signup(): void

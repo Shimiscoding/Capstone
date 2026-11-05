@@ -89,8 +89,8 @@ class EnforcerAttendanceController extends Controller
         $this->ensureAssignedEnforcer($request, $user);
 
         $attendance = $user->enforcerAttendances()->whereDate('attendance_date', $rules->date())->whereNotNull('time_in')->whereNull('time_out')->latest('time_in')->first()
-            ?? EnforcerAttendance::where('user_id', $user->id)->whereDate('attendance_date', $rules->date())->where('session', $rules->session($user))->first();
-        if ($error = $rules->timeOutError($user, session: $attendance?->session)) {
+            ?? EnforcerAttendance::where('user_id', $user->id)->whereDate('attendance_date', $rules->date())->latest('time_in')->orderByDesc('id')->first();
+        if ($error = $rules->timeOutError($user)) {
             return back()->with('enforcer_attendance_error', $error);
         }
 

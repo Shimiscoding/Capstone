@@ -20,9 +20,9 @@ $staff->id = 2147000001;
 $records = collect(range(0, 4))->map(function ($day) use ($staff) {
     $date = Carbon::parse('2026-10-15')->subDays($day);
     $record = new EnforcerAttendance([
-        'user_id' => $staff->id, 'attendance_date' => $date, 'session' => $day === 1 ? 'afternoon' : 'morning',
-        'time_in' => $date->copy()->setTime($day === 1 ? 13 : 8, 5),
-        'time_out' => $day === 2 ? null : $date->copy()->setTime($day === 1 ? 17 : 12, 0),
+        'user_id' => $staff->id, 'attendance_date' => $date, 'session' => EnforcerAttendance::WHOLE_DAY,
+        'time_in' => $date->copy()->setTime(8, 5),
+        'time_out' => $day === 2 ? null : $date->copy()->setTime(17, 0),
         'time_in_latitude' => $day === 4 ? null : 11.24, 'time_in_longitude' => $day === 4 ? null : 125.0,
         'time_out_latitude' => $day === 0 ? 11.25 : null, 'time_out_longitude' => $day === 0 ? 125.01 : null,
     ]);

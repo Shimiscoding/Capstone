@@ -4,17 +4,16 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Models\Violation;
-use App\Models\ViolationIssued;
 use App\Notifications\UserActivityNotification;
 use App\Notifications\UserCreatedNotification;
+use App\Services\AnalyticsReport;
 use App\Services\ProfilePhoto;
 use App\Services\Settings;
+use App\Services\ViolationRecords;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\Rule;
 
@@ -26,45 +25,9 @@ class DashboardController extends Controller
     |--------------------------------------------------------------------------
     */
 
-    public function violationRecords(Request $request): View
+    public function violationRecords(Request $request, ViolationRecords $records): View
     {
-        $search = trim((string) $request->query('search', ''));
-        $violationType = trim((string) $request->query('violation_type', ''));
-        $dateFrom = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $request->query('date_from'))
-            ? (string) $request->query('date_from')
-            : '';
-        $dateTo = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $request->query('date_to'))
-            ? (string) $request->query('date_to')
-            : '';
-        $query = Violation::query()
-            ->when($search !== '', function ($query) use ($search): void {
-                $query->where(function ($query) use ($search): void {
-                    $query->where('plate_number', 'like', "%{$search}%")
-                        ->orWhereHas('issuedViolations', fn ($offenses) => $offenses
-                            ->where('description_snapshot', 'like', "%{$search}%")
-                            ->orWhereHas('formOption', fn ($options) => $options->where('label', 'like', "%{$search}%"))
-                            ->orWhereHas('type', fn ($types) => $types->where('section_id', $search)));
-                });
-            })
-            ->when($violationType !== '', fn ($query) => $query->whereHas('issuedViolations.formOption',
-                fn ($options) => $options->where('label', $violationType)))
-            ->when($dateFrom !== '', fn ($query) => $query->whereDate('created_at', '>=', $dateFrom))
-            ->when($dateTo !== '', fn ($query) => $query->whereDate('created_at', '<=', $dateTo));
-
-        $summaryQuery = Violation::query();
-
-        return view('dashboard.violation-records', [
-            'violations' => (clone $query)->latest()->paginate(15)->withQueryString(),
-            'search' => $search,
-            'violationType' => $violationType,
-            'dateFrom' => $dateFrom,
-            'dateTo' => $dateTo,
-            'violationTypes' => ViolationIssued::query()->whereHas('ticketItems')->orderBy('sort_order')->pluck('label'),
-            'totalViolations' => (clone $summaryQuery)->count(),
-            'violationsThisMonth' => (clone $summaryQuery)
-                ->whereBetween('created_at', [now()->startOfMonth(), now()->endOfMonth()])
-                ->count(),
-        ]);
+        return view('dashboard.violation-records', $records->build($request));
     }
 
     public function violationRecord(Violation $violation): View
@@ -95,102 +58,12 @@ class DashboardController extends Controller
         ]);
     }
 
-    public function analytics(Request $request, Settings $settings): View
+    public function analytics(Request $request, AnalyticsReport $report): View
     {
         abort_if($request->user()->isSupervisor(), 403);
-        $summaryRange = $request->query('summary', 'today');
-        $summaryRange = $summaryRange === 'days' ? 'week' : $summaryRange;
-        $summaryRange = in_array($summaryRange, ['today', 'week', 'month', 'year', 'all'], true) ? $summaryRange : 'today';
-        $localNow = now('Asia/Manila');
-        $start = match ($summaryRange) {
-            'week' => $localNow->copy()->startOfWeek(),
-            'month' => $localNow->copy()->startOfMonth(),
-            'year' => $localNow->copy()->startOfYear(),
-            'all' => collect([Violation::query()->min('created_at'), User::query()->min('created_at')])->filter()->min(),
-            default => $localNow->copy()->startOfDay(),
-        };
-        if ($summaryRange === 'all') {
-            $start = $start ? Carbon::parse($start, config('app.timezone'))->setTimezone('Asia/Manila')->startOfYear() : $localNow->copy()->startOfYear();
-        }
-        $rangeStart = $start->copy()->setTimezone(config('app.timezone'));
-        $rangeEnd = $localNow->copy()->setTimezone(config('app.timezone'));
-        $buckets = collect();
-        $cursor = $start->copy();
-        while ($cursor->lte($localNow)) {
-            $end = match ($summaryRange) {
-                'today' => $cursor->copy()->endOfHour(),
-                'year' => $cursor->copy()->endOfMonth(),
-                'all' => $cursor->copy()->endOfYear(),
-                default => $cursor->copy()->endOfDay(),
-            };
-            $buckets->push(['label' => $cursor->format(match ($summaryRange) {
-                'today' => 'H:00', 'year' => 'M', 'all' => 'Y', default => 'M d',
-            }), 'date' => $cursor->format('M d, Y H:i'),
-                'start' => $cursor->copy()->setTimezone(config('app.timezone')),
-                'end' => $end->min($localNow)->setTimezone(config('app.timezone'))]);
-            match ($summaryRange) {
-                'today' => $cursor->addHour(), 'year' => $cursor->addMonthNoOverflow(),
-                'all' => $cursor->addYear(), default => $cursor->addDay(),
-            };
-        }
-        $dailyViolations = $buckets->map(fn (array $item): array => $item + [
-            'value' => Violation::query()->whereBetween('created_at', [$item['start'], $item['end']])->count(),
-        ]);
-        $dailyUsers = $buckets->map(fn (array $item): array => $item + [
-            'value' => User::query()->whereBetween('created_at', [$item['start'], $item['end']])->count(),
-        ]);
-        $periodTickets = Violation::query()->whereBetween('created_at', [$rangeStart, $rangeEnd]);
-        $summaryTotal = (clone $periodTickets)->count();
-        $summaryResolved = (clone $periodTickets)->where('status', 'paid')->count();
-        $summary = ['total' => $summaryTotal, 'resolved' => $summaryResolved, 'pending' => $summaryTotal - $summaryResolved,
-            'enforcers' => (clone $periodTickets)->whereHas('enforcer', fn ($query) => $query->where('role', User::ROLE_OFFICER))->distinct()->count('enforcer_id')];
-        $description = match ($summaryRange) {
-            'today' => 'today', 'week' => 'this week', 'month' => 'this month', 'year' => 'this year', 'all' => 'all time',
-        };
-        $periodViolationTotal = (clone $periodTickets)->count();
-        $resolvedTickets = (clone $periodTickets)->where('status', 'paid')->count();
-        $activeEnforcers = (clone $periodTickets)
-            ->whereHas('enforcer', fn ($query) => $query->where('role', User::ROLE_OFFICER))
-            ->distinct()->count('enforcer_id');
-        // Count each ticket once per common group even when it cites several sections.
-        $violationTrends = DB::table('Ticket_issued as tickets')
-            ->join('ticket_violation_items as offenses', 'offenses.ticket_issued_id', '=', 'tickets.id')
-            ->join('violation_issued as options', 'options.id', '=', 'offenses.violation_issued_id')
-            ->whereBetween('tickets.created_at', [$rangeStart, $rangeEnd])
-            ->selectRaw('options.label as violation_type, COUNT(DISTINCT tickets.id) as total')
-            ->selectRaw("COUNT(DISTINCT CASE WHEN tickets.status = 'paid' THEN tickets.id END) as resolved")
-            ->groupBy('options.id', 'options.label')->orderByDesc('total')->orderBy('options.label')
-            ->get();
-        $otherViolationTickets = (clone $periodTickets)->whereDoesntHave('issuedViolations.formOption',
-            fn ($options) => $options->whereIn('label', $violationTrends->pluck('violation_type')))->count();
-        $vehicleTrends = (clone $periodTickets)
-            ->selectRaw('vehicle_type, COUNT(*) as total')
-            ->whereNotNull('vehicle_type')
-            ->where('vehicle_type', '!=', '')
-            ->groupBy('vehicle_type')
-            ->orderByDesc('total')
-            ->orderBy('vehicle_type')
-            ->limit(10)
-            ->get();
 
-        return view('dashboard.analytics', [
-            'dailyViolations' => $dailyViolations,
-            'dailyUsers' => $dailyUsers,
-            'summary' => $summary,
-            'summaryRange' => $summaryRange,
-            'summaryDescription' => $description,
-            'vehicleTrends' => $vehicleTrends,
-            'periodViolationTotal' => $periodViolationTotal,
-            'activeEnforcers' => $activeEnforcers,
-            'pendingTickets' => $periodViolationTotal - $resolvedTickets,
-            'resolvedTickets' => $resolvedTickets,
-            'violationTrends' => $violationTrends,
-            'otherViolationTickets' => $otherViolationTickets,
-            'periodUserTotal' => $dailyUsers->sum('value'),
-            'periodDescription' => $description,
-        ]);
+        return view('dashboard.analytics', $report->build($request));
     }
-
     /*
     |--------------------------------------------------------------------------
     | Dashboard
@@ -204,39 +77,51 @@ class DashboardController extends Controller
         }
 
         if ($request->user()->isSupervisor()) {
-            $supervisor = $request->user()->load(['enforcers' => fn ($query) => $query
-                ->where('role', User::ROLE_OFFICER)
-                ->orderBy('firstName')
-                ->orderBy('lastName')]);
+            $supervisor = $request->user();
+            $teamQuery = $supervisor->enforcers()->where('role', User::ROLE_OFFICER);
+            $teamAreas = (clone $teamQuery)->pluck('area')->map(fn ($area) => trim((string) $area));
+            $coverageAreas = $teamAreas->filter(fn ($area) => $area !== '')->countBy()->sortDesc();
+            $enforcerCount = $teamAreas->count();
+            $page = min(max(1, $request->integer('page', 1)), max(1, (int) ceil($enforcerCount / 8)));
 
             return view('supervisor.index', [
                 'supervisor' => $supervisor,
-                'todayAttendance' => $supervisor->supervisorAttendances()
-                    ->whereDate('attendance_date', today())
-                    ->first(),
-                'enforcerCount' => $supervisor->enforcers->count(),
-                'areaCount' => $supervisor->enforcers->pluck('area')->filter()->unique()->count(),
+                'enforcers' => (clone $teamQuery)->orderBy('firstName')->orderBy('lastName')->orderBy('id')
+                    ->paginate(8, ['*'], 'page', $page)->withQueryString(),
+                'enforcerCount' => $enforcerCount,
+                'areaCount' => $coverageAreas->count(),
+                'unassignedAreaCount' => $teamAreas->filter(fn ($area) => $area === '')->count(),
+                'coverageAreas' => $coverageAreas->take(4),
+                'dashboardNow' => now('Asia/Manila'),
             ]);
         }
 
+        $dashboardNow = now('Asia/Manila');
+        $storageTimezone = config('app.timezone');
+        $todayStart = $dashboardNow->copy()->startOfDay()->setTimezone($storageTimezone);
+        $tomorrowStart = $dashboardNow->copy()->addDay()->startOfDay()->setTimezone($storageTimezone);
         $violationQuery = Violation::query();
-        $activityDays = collect(range(6, 0))->map(function (int $daysAgo): array {
-            $date = now()->subDays($daysAgo);
-            $start = $date->copy()->startOfDay();
-            $end = $date->copy()->endOfDay();
+        $todayTickets = (clone $violationQuery)->where('created_at', '>=', $todayStart)->where('created_at', '<', $tomorrowStart);
+        $activityDays = collect(range(6, 0))->map(function (int $daysAgo) use ($dashboardNow, $storageTimezone): array {
+            $date = $dashboardNow->copy()->subDays($daysAgo);
+            $start = $date->copy()->startOfDay()->setTimezone($storageTimezone);
+            $end = $date->copy()->addDay()->startOfDay()->setTimezone($storageTimezone);
 
             return [
-                'label' => $date->format('D'),
-                'violations' => Violation::query()->whereBetween('created_at', [$start, $end])->count(),
-                'users' => User::query()->whereBetween('created_at', [$start, $end])->count(),
+                'label' => $date->format('D j'),
+                'date' => $date->format('M j, Y'),
+                'violations' => Violation::query()->where('created_at', '>=', $start)->where('created_at', '<', $end)->count(),
+                'users' => User::query()->where('created_at', '>=', $start)->where('created_at', '<', $end)->count(),
             ];
         });
 
         return view('dashboard.index', [
+            'dashboardNow' => $dashboardNow,
             'totalUsers' => User::count(),
-            'totalTickets' => (clone $violationQuery)->count(),
-            'outstandingTickets' => (clone $violationQuery)->where('status', '!=', 'paid')->count(),
-            'recentViolations' => (clone $violationQuery)->latest()->take(5)->get(),
+            'todayTickets' => (clone $todayTickets)->count(),
+            'todayAssessedFines' => (clone $todayTickets)->sum('fine_amount'),
+            'outstandingTickets' => (clone $violationQuery)->where(fn ($query) => $query->where('status', '!=', 'paid')->orWhereNull('status'))->count(),
+            'recentViolations' => (clone $violationQuery)->latest()->orderByDesc('id')->take(5)->get(),
             'activityDays' => $activityDays,
         ]);
     }
@@ -300,13 +185,6 @@ class DashboardController extends Controller
     {
         $this->ensureAdmin($request);
 
-        $attendanceType = in_array($request->query('type'), ['supervisor', 'enforcer'], true)
-            ? $request->query('type')
-            : 'supervisor';
-        $role = match ($attendanceType) {
-            'enforcer' => User::ROLE_OFFICER,
-            default => User::ROLE_SUPERVISOR,
-        };
         $search = trim((string) $request->query('search', ''));
         $nameTerms = preg_split('/\s+/', $search, -1, PREG_SPLIT_NO_EMPTY) ?: [];
         $sort = in_array($request->query('sort'), ['latest', 'oldest', 'name_asc', 'name_desc'], true)
@@ -315,7 +193,7 @@ class DashboardController extends Controller
 
         return view('supervisor.attendance', [
             'staffMembers' => User::query()
-                ->where('role', $role)
+                ->where('role', User::ROLE_OFFICER)
                 ->when($nameTerms !== [], function ($query) use ($nameTerms) {
                     foreach ($nameTerms as $term) {
                         $query->where(function ($nameQuery) use ($term) {
@@ -328,7 +206,7 @@ class DashboardController extends Controller
                         });
                     }
                 })
-                ->withCount(['supervisorAttendances', 'enforcerAttendances'])
+                ->withCount('enforcerAttendances')
                 ->when($sort === 'latest', fn ($query) => $query->orderByDesc('created_at'))
                 ->when($sort === 'oldest', fn ($query) => $query->orderBy('created_at'))
                 ->when($sort === 'name_asc', fn ($query) => $query->orderBy('firstName')->orderBy('lastName'))
@@ -337,7 +215,7 @@ class DashboardController extends Controller
                 ->withQueryString(),
             'search' => $search,
             'sort' => $sort,
-            'attendanceType' => $attendanceType,
+            'attendanceType' => 'enforcer',
         ]);
     }
 

@@ -20,13 +20,13 @@
                 @forelse ($attendances as $attendance)
                     <tr>
                         <th scope="row"><span class="attendance-cell-value">{{ $attendance->attendance_date->format('M d, Y') }}</span><small class="attendance-cell-detail">{{ $attendance->attendance_date->format('l') }}</small></th>
-                        @if ($enforcer)<td>{{ ucfirst($attendance->session) }}</td>@endif
+                        @if ($enforcer)<td>{{ $attendance->dutyLabel() }}</td>@endif
                         @foreach (['time_in' => 'Time in', 'time_out' => 'Time out'] as $field => $label)
                             <td>
                                 <span class="attendance-cell-value">{{ $attendance->$field?->format('h:i:s A') ?? '—' }}</span>
                                 @if ($enforcer)
                                     @if ($attendance->{$field.'_latitude'} !== null && $attendance->{$field.'_longitude'} !== null)
-                                        <a class="attendance-cell-detail attendance-map-link" href="https://www.google.com/maps?q={{ $attendance->{$field.'_latitude'} }},{{ $attendance->{$field.'_longitude'} }}" target="_blank" rel="noopener noreferrer" aria-label="{{ $label }} location for {{ $attendance->attendance_date->format('M d, Y') }}, {{ $attendance->session }} duty (opens in a new tab)">Open map</a>
+                                        <a class="attendance-cell-detail attendance-map-link" href="https://www.google.com/maps?q={{ $attendance->{$field.'_latitude'} }},{{ $attendance->{$field.'_longitude'} }}" target="_blank" rel="noopener noreferrer" aria-label="{{ $label }} location for {{ $attendance->attendance_date->format('M d, Y') }}, {{ $attendance->dutyLabel() }} duty (opens in a new tab)">Open map</a>
                                     @else
                                         <small class="attendance-cell-detail">{{ $attendance->$field ? 'Location unavailable' : 'Not recorded' }}</small>
                                     @endif
@@ -37,8 +37,8 @@
                         <td><span class="attendance-state {{ $attendance->time_out ? 'is-complete' : 'is-active' }}">{{ $attendance->time_out ? 'Completed' : 'Timed in' }}</span></td>
                         @if ($canManage)
                             <td><div class="attendance-row-actions">
-                                <button type="button" class="attendance-record-button" data-attendance-edit data-url="{{ route($routePrefix.'.time-out', $attendance) }}" data-label="{{ $attendance->attendance_date->format('l, M d, Y') }}{{ $enforcer ? ' · '.ucfirst($attendance->session).' duty' : '' }}" data-time-in="{{ $attendance->time_in?->format('H:i') }}" data-time-out="{{ $attendance->time_out?->format('H:i') }}" aria-label="Edit attendance for {{ $attendance->attendance_date->format('M d, Y') }}{{ $enforcer ? ', '.$attendance->session.' duty' : '' }}">Edit</button>
-                                <button type="button" class="attendance-record-button is-danger" data-attendance-delete data-url="{{ route($routePrefix.'.destroy', $attendance) }}" data-label="{{ $attendance->attendance_date->format('l, M d, Y') }}{{ $enforcer ? ' · '.ucfirst($attendance->session).' duty' : '' }}" aria-label="Delete attendance for {{ $attendance->attendance_date->format('M d, Y') }}{{ $enforcer ? ', '.$attendance->session.' duty' : '' }}">Delete</button>
+                                <button type="button" class="attendance-record-button" data-attendance-edit data-url="{{ route($routePrefix.'.time-out', $attendance) }}" data-label="{{ $attendance->attendance_date->format('l, M d, Y') }}{{ $enforcer ? ' · '.$attendance->dutyLabel().' duty' : '' }}" data-time-in="{{ $attendance->time_in?->format('H:i') }}" data-time-out="{{ $attendance->time_out?->format('H:i') }}" aria-label="Edit attendance for {{ $attendance->attendance_date->format('M d, Y') }}{{ $enforcer ? ', '.$attendance->dutyLabel().' duty' : '' }}">Edit</button>
+                                <button type="button" class="attendance-record-button is-danger" data-attendance-delete data-url="{{ route($routePrefix.'.destroy', $attendance) }}" data-label="{{ $attendance->attendance_date->format('l, M d, Y') }}{{ $enforcer ? ' · '.$attendance->dutyLabel().' duty' : '' }}" aria-label="Delete attendance for {{ $attendance->attendance_date->format('M d, Y') }}{{ $enforcer ? ', '.$attendance->dutyLabel().' duty' : '' }}">Delete</button>
                             </div></td>
                         @endif
                     </tr>

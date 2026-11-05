@@ -4,6 +4,28 @@
 @section('activePage', 'supervisor-team')
 @section('workspaceClass', 'workspace-full-width')
 
+@push('styles')
+    <style>
+        #availableEnforcersModal {
+            max-height: min(720px, calc(100dvh - 32px));
+            border: 1px solid var(--line);
+            border-radius: var(--radius-surface);
+            background: var(--panel);
+            box-shadow: var(--shadow);
+        }
+        #availableEnforcersModal[open] { display: flex; flex-direction: column; }
+        #availableEnforcersModal::backdrop {
+            background: color-mix(in srgb, var(--text) 35%, transparent);
+            backdrop-filter: none;
+            -webkit-backdrop-filter: none;
+        }
+        #availableEnforcersModal .supervisor-modal-heading,
+        #availableEnforcersModal .enforcer-modal-search { flex: 0 0 auto; }
+        #availableEnforcersModal .table-scroll { flex: 1 1 auto; min-height: 0; max-height: none; overflow: auto; }
+        #availableEnforcersTitle:focus { outline: none; }
+    </style>
+@endpush
+
 @section('content')
     <div class="page-head users-page-head">
         <div class="users-heading-copy">
@@ -50,9 +72,9 @@
                                         class="location-truncate">{{ $enforcer->address ?: 'No address' }}</small>
                                 </td>
                                 <td>
-                                    <form method="POST" action="{{ route('supervisor.team.remove', $enforcer) }}"
+                                    <form class="user-inline-actions" method="POST" action="{{ route('supervisor.team.remove', $enforcer) }}"
                                         onsubmit="return confirm('Remove this enforcer from your team?')">@csrf
-                                        @method('DELETE')<details class="user-actions-menu"><summary aria-label="Actions" title="Actions">&#8942;</summary><div class="user-actions-dropdown"><button class="user-action action-delete" type="submit">Remove</button></div></details>
+                                        @method('DELETE')<button class="user-action action-delete" type="submit" aria-label="Remove {{ $enforcer->fullName }} from team">Remove</button>
                                     </form>
                                 </td>
                         </tr>@empty<tr>
@@ -66,11 +88,11 @@
             <div class="table-footer"><span>Showing {{ $teamMembers->count() }} of {{ $teamMembers->count() }}</span></div>
         </section>
 
-    <dialog class="supervisor-details-modal available-enforcers-modal" id="availableEnforcersModal">
+    <dialog class="supervisor-details-modal available-enforcers-modal" id="availableEnforcersModal" aria-labelledby="availableEnforcersTitle">
         <div class="supervisor-modal-heading">
             <div>
                 <p class="eyebrow">Available</p>
-                <h2>Unassigned enforcers</h2>
+                <h2 id="availableEnforcersTitle" tabindex="-1">Unassigned enforcers</h2>
             </div><button id="closeAvailableEnforcers" type="button"
                 aria-label="Close available enforcers">&times;</button>
         </div>
@@ -120,6 +142,8 @@
 @push('scripts')
     <script>
         const availableEnforcersModal = document.getElementById('availableEnforcersModal');
+        const openAvailableEnforcers = document.getElementById('openAvailableEnforcers');
+        const availableEnforcersTitle = document.getElementById('availableEnforcersTitle');
         const teamEnforcerSearch = document.getElementById('teamEnforcerSearch');
         const teamEnforcerRows = [...document.querySelectorAll('#teamAvailableEnforcers tr[data-enforcer-name]')];
         const teamSearchEmpty = document.querySelector('#teamAvailableEnforcers .enforcer-search-empty');
@@ -129,9 +153,19 @@
             const query = teamMemberSearch.value.trim().toLowerCase();
             teamMemberRows.forEach(row => row.hidden = !row.dataset.teamMember.includes(query));
         });
-        document.getElementById('openAvailableEnforcers').addEventListener('click', () => availableEnforcersModal
-        .showModal());
+        openAvailableEnforcers.addEventListener('click', () => {
+            availableEnforcersModal.showModal();
+            availableEnforcersTitle.focus({ preventScroll: true });
+        });
         document.getElementById('closeAvailableEnforcers').addEventListener('click', () => availableEnforcersModal.close());
+        availableEnforcersModal.addEventListener('close', () => openAvailableEnforcers.focus({ preventScroll: true }));
+        availableEnforcersModal.addEventListener('keydown', event => {
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                event.stopPropagation();
+                availableEnforcersModal.close();
+            }
+        });
         availableEnforcersModal.addEventListener('click', event => {
             if (event.target === availableEnforcersModal) availableEnforcersModal.close();
         });

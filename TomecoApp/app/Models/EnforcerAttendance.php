@@ -7,6 +7,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class EnforcerAttendance extends Model
 {
+    public const WHOLE_DAY = 'whole_day';
+
+    protected $attributes = ['session' => self::WHOLE_DAY];
+
     protected $fillable = [
         'user_id', 'supervisor_id', 'session', 'attendance_date', 'time_in', 'time_out',
         'time_in_latitude', 'time_in_longitude', 'time_out_latitude', 'time_out_longitude',
@@ -29,5 +33,10 @@ class EnforcerAttendance extends Model
     public function supervisor(): BelongsTo
     {
         return $this->belongsTo(User::class, 'supervisor_id');
+    }
+
+    public function dutyLabel(): string
+    {
+        return $this->session === self::WHOLE_DAY ? 'Whole day' : ucfirst((string) $this->session);
     }
 }

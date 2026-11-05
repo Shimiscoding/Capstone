@@ -6,10 +6,7 @@
     @php
         $tabs = [
             'general' => 'General',
-            'violations' => 'Violations & Fines',
-            'permissions' => 'Roles & Permissions',
             'notifications' => 'Notifications',
-            'data' => 'Import & Export',
             'security' => 'Security',
         ];
         $activeTab = array_key_exists($activeTab, $tabs) ? $activeTab : 'general';
@@ -32,7 +29,7 @@
         <div>
             <p class="eyebrow">Administration</p>
             <h1>System Settings</h1>
-            <p class="page-description">Configure TOMECO operations, access, and data policies.</p>
+            <p class="page-description">Manage general preferences, notifications, and security.</p>
         </div>
     </div>
 
@@ -77,57 +74,22 @@
                         <label>
                             <span>Timezone</span>
                             <select name="timezone">
-                                <option>Asia/Manila</option>
-                                <option>UTC</option>
+                                <option value="Asia/Manila" @selected($get('timezone') === 'Asia/Manila')>Asia/Manila</option>
+                                <option value="UTC" @selected($get('timezone') === 'UTC')>UTC</option>
                             </select>
                         </label>
                         <label>
                             <span>Date format</span>
                             <select name="date_format">
-                                <option value="M j, Y">Jul 22, 2026</option>
-                                <option value="Y-m-d">2026-07-22</option>
-                                <option value="d/m/Y">22/07/2026</option>
+                                <option value="M j, Y" @selected($get('date_format') === 'M j, Y')>Jul 22, 2026</option>
+                                <option value="Y-m-d" @selected($get('date_format') === 'Y-m-d')>2026-07-22</option>
+                                <option value="d/m/Y" @selected($get('date_format') === 'd/m/Y')>22/07/2026</option>
                             </select>
                         </label>
                         <label>
                             <span>Violation prefix</span>
                             <input name="violation_prefix" value="{{ $get('violation_prefix') }}" required>
                         </label>
-                    @elseif ($activeTab === 'violations')
-                        <label>
-                            <span>Late fee (PHP)</span>
-                            <input type="number" step="0.01" name="late_fee" value="{{ $get('late_fee') }}"
-                                min="0" required>
-                        </label>
-                        <label class="wide">
-                            <span>Violation catalog <small>One per line: Name | Fine</small></span>
-                            <textarea name="catalog_text" rows="7" required>{{ collect($settings['violations.catalog'])->map(fn($violation) => $violation['name'] . ' | ' . $violation['fine'])->join("\n") }}</textarea>
-                        </label>
-                    @elseif ($activeTab === 'permissions')
-                        @php
-                            $permissions = [
-                                'manage_users' => 'Manage users',
-                                'manage_settings' => 'Manage settings',
-                                'record_violations' => 'Record violations',
-                                'import' => 'Import files',
-                                'export' => 'Export reports',
-                            ];
-                        @endphp
-                        @foreach (['admin' => 'Administrator', 'supervisor' => 'Supervisor'] as $role => $roleLabel)
-                            <fieldset class="permission-group">
-                                <legend>{{ $roleLabel }}</legend>
-                                @foreach ($permissions as $permission => $label)
-                                    <label class="toggle-field">
-                                        <input type="checkbox" name="{{ $role }}[]" value="{{ $permission }}"
-                                            @checked(in_array($permission, $settings['permissions.' . $role])) @disabled($role === 'admin' && $permission === 'manage_settings')>
-                                        <span>{{ $label }}</span>
-                                    </label>
-                                @endforeach
-                                @if ($role === 'admin')
-                                    <input type="hidden" name="admin[]" value="manage_settings">
-                                @endif
-                            </fieldset>
-                        @endforeach
                     @elseif ($activeTab === 'notifications')
                         @foreach (['new_violation' => 'New violation alerts', 'overdue_reminder' => 'Overdue fine reminders'] as $key => $label)
                             <label class="toggle-field">
@@ -140,30 +102,6 @@
                             <span>Administrative recipient email</span>
                             <input type="email" name="recipient_email" value="{{ $get('recipient_email') }}">
                         </label>
-                    @elseif ($activeTab === 'data')
-                        @foreach (['max_upload_mb' => 'Maximum upload size (MB)', 'history_days' => 'Import history retention (days)'] as $field => $label)
-                            <label>
-                                <span>{{ $label }}</span>
-                                <input type="number" name="{{ $field }}" value="{{ $get($field) }}"
-                                    min="1">
-                            </label>
-                        @endforeach
-                        <label>
-                            <span>Duplicate references</span>
-                            <select name="duplicate_behavior">
-                                <option value="update" @selected($get('duplicate_behavior') === 'update')>Update existing record</option>
-                                <option value="skip" @selected($get('duplicate_behavior') === 'skip')>Skip duplicate</option>
-                            </select>
-                        </label>
-                        <label>
-                            <span>Default export format</span>
-                            <select name="default_format">
-                                @foreach (['xlsx', 'xls', 'csv'] as $format)
-                                    <option @selected($get('default_format') === $format)>{{ $format }}</option>
-                                @endforeach
-                            </select>
-                        </label>
-                        <div class="settings-note wide">Spreadsheet exports use the format selected above.</div>
                     @elseif ($activeTab === 'security')
                         @foreach (['password_min_length' => 'Minimum password length', 'session_timeout' => 'Session timeout (minutes)', 'login_attempts' => 'Maximum login attempts', 'api_token_days' => 'API token expiry (days)', 'audit_retention_days' => 'Audit retention (days)'] as $field => $label)
                             <label>
@@ -190,29 +128,3 @@
         </section>
     </div>
 @endsection
-
-@push('scripts')
-    <script>
-        document.querySelectorAll('[data-lines]').forEach((area) => {
-            const sync = () => {
-                const box = document.querySelector(`[data-line-inputs="${area.dataset.lines}"]`);
-                box.innerHTML = '';
-
-                area.value
-                    .split(/\r?\n/)
-                    .map((value) => value.trim())
-                    .filter(Boolean)
-                    .forEach((value) => {
-                        const input = document.createElement('input');
-                        input.type = 'hidden';
-                        input.name = `${area.dataset.lines}[]`;
-                        input.value = value;
-                        box.appendChild(input);
-                    });
-            };
-
-            area.addEventListener('input', sync);
-            sync();
-        });
-    </script>
-@endpush

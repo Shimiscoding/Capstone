@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Services\Settings;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -27,6 +28,21 @@ class PasswordResetTest extends TestCase
             ->assertSessionHasNoErrors();
 
         Notification::assertSentTo($user, ResetPassword::class);
+    }
+
+    public function test_reset_page_preserves_link_details_and_configured_password_minimum(): void
+    {
+        app(Settings::class)->putMany(['security.password_min_length' => 12]);
+
+        $this->get(route('password.reset', [
+            'token' => 'preview-reset-token',
+            'email' => 'preview@example.com',
+        ]))
+            ->assertOk()
+            ->assertSee('name="token" value="preview-reset-token"', false)
+            ->assertSee('value="preview@example.com"', false)
+            ->assertSee('minlength="12"', false)
+            ->assertSeeText('At least 12 characters.');
     }
 
     public function test_password_can_be_reset_with_a_valid_token(): void

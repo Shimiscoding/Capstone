@@ -1,52 +1,17 @@
-<!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+<x-auth-layout title="Reset password" page="reset-password">
+    <p class="auth-page-label">Password recovery</p>
+    <h1 id="auth-heading" class="auth-title">Choose a new password</h1>
+    <p class="auth-description">Enter and confirm your new password to get back to your account.</p>
 
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Reset password</title>
-    <link rel="stylesheet" href="{{ asset('css/auth.css') }}">
-    <link rel="icon" href="{{ asset('images/favicon.ico') }}">
-</head>
+    <form method="POST" action="{{ route('password.update') }}" class="auth-form" data-auth-form novalidate>
+        @csrf
+        <input type="hidden" name="token" value="{{ $token }}">
+        <x-auth-field name="email" label="Email" type="email" :value="$email" autocomplete="email" placeholder="you@example.com" required autofocus maxlength="255" />
+        <x-auth-field name="password" label="New password" type="password" autocomplete="new-password" placeholder="Create a new password" required minlength="{{ $passwordMinLength }}" hint="At least {{ $passwordMinLength }} characters." />
+        <x-auth-field name="password_confirmation" label="Confirm new password" type="password" autocomplete="new-password" placeholder="Repeat your new password" required />
+        <p class="auth-form-status sr-only" role="status" aria-live="polite"></p>
+        <button type="submit" class="auth-button" data-busy-label="Resetting password…">Reset password</button>
+    </form>
 
-<body class="auth-page login-page">
-    <main class="auth-shell">
-        <section class="auth-card">
-            <div class="auth-brand auth-brand-with-logo">
-                <img src="{{ asset('images/Tomeco_icon.jpg') }}" alt="TOMECO official seal">
-                <span><strong>TOMECO</strong><small>Traffic Operation Management Enforcement and Control Office
-                        Tacloban</small></span>
-            </div>
-            <h1 class="auth-title">Choose a new password</h1>
-
-            <form method="POST" action="{{ route('password.update') }}" class="auth-form">
-                @csrf
-                <input type="hidden" name="token" value="{{ $token }}">
-                <div>
-                    <label for="email" class="auth-label">Email</label>
-                    <input id="email" name="email" type="email" value="{{ old('email', $email) }}"
-                        autocomplete="email" required autofocus class="auth-input">
-                    @error('email')
-                        <p class="auth-error">{{ $message }}</p>
-                    @enderror
-                </div>
-                <div>
-                    <label for="password" class="auth-label">New password</label>
-                    <input id="password" name="password" type="password" autocomplete="new-password" required
-                        class="auth-input">
-                    @error('password')
-                        <p class="auth-error">{{ $message }}</p>
-                    @enderror
-                </div>
-                <div>
-                    <label for="password_confirmation" class="auth-label">Confirm new password</label>
-                    <input id="password_confirmation" name="password_confirmation" type="password"
-                        autocomplete="new-password" required class="auth-input">
-                </div>
-                <button type="submit" class="auth-button">Reset password</button>
-            </form>
-        </section>
-    </main>
-</body>
-
-</html>
+    <p class="auth-note"><a href="{{ route('login') }}" class="auth-link">Back to login</a></p>
+</x-auth-layout>

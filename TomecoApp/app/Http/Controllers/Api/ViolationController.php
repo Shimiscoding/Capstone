@@ -34,7 +34,7 @@ class ViolationController extends Controller
             'last_name' => ['required', 'string', 'max:100'],
             'license_number' => ['nullable', 'string', 'max:100'],
             'license_type' => ['nullable', 'string', 'in:professional,non_professional,student_permit'],
-            'plate_number' => ['required', 'string', 'max:50'],
+            'plate_number' => ['nullable', 'string', 'max:50'],
             'vehicle_type' => ['required', 'string', 'max:1000'],
             'registration_plate_number' => ['nullable', 'string', 'max:100'],
             'vehicle_make' => ['nullable', 'string', 'max:255'],
