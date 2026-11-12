@@ -2,11 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\EnforcerAttendance;
 use App\Models\User;
-use App\Services\AttendanceRules;
 use App\Services\EnforcerDuty;
-use App\Services\OfficerLocationService;
+use App\Support\StaffDirectory;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -18,9 +16,8 @@ class EnforcerAttendanceController extends Controller
     {
         abort_unless($request->user()->isSupervisor(), 403);
 
-        $search = trim((string) $request->query('search', ''));
-        $sort = (string) $request->query('sort', 'name_asc');
-        $sort = in_array($sort, ['latest', 'oldest', 'name_asc', 'name_desc'], true) ? $sort : 'name_asc';
+        $directory = new StaffDirectory($request, defaultSort: 'name_asc');
+        $search = $directory->search;
 
         $enforcers = User::query()
             ->where('role', User::ROLE_OFFICER)
@@ -37,17 +34,10 @@ class EnforcerAttendanceController extends Controller
             ->withCount('enforcerAttendances')
             ->withMax('enforcerAttendances', 'time_in');
 
-        match ($sort) {
-            'latest' => $enforcers->latest(),
-            'oldest' => $enforcers->oldest(),
-            'name_desc' => $enforcers->orderByDesc('firstName')->orderByDesc('lastName'),
-            default => $enforcers->orderBy('firstName')->orderBy('lastName'),
-        };
-
         return view('supervisor.enforcer-attendance', [
-            'enforcers' => $enforcers->paginate(20)->withQueryString(),
+            'enforcers' => $directory->order($enforcers)->paginate(20)->withQueryString(),
             'search' => $search,
-            'sort' => $sort,
+            'sort' => $directory->sort,
         ]);
     }
 
@@ -69,14 +59,11 @@ class EnforcerAttendanceController extends Controller
         ]);
     }
 
-    public function timeIn(Request $request, User $user, AttendanceRules $rules): RedirectResponse
+    public function timeIn(Request $request, User $user, EnforcerDuty $duty): RedirectResponse
     {
         $this->ensureAssignedEnforcer($request, $user);
-        if ($error = $rules->timeInError($user)) {
-            return back()->with('enforcer_attendance_error', $error);
-        }
         try {
-            app(EnforcerDuty::class)->timeIn($user, $rules, ['supervisor_id' => $request->user()->id, 'time_in' => now()]);
+            $duty->timeIn($user, []);
         } catch (ValidationException $exception) {
             return back()->with('enforcer_attendance_error', $exception->validator->errors()->first());
         }
@@ -84,24 +71,15 @@ class EnforcerAttendanceController extends Controller
         return back()->with('enforcer_attendance_success', 'Time in recorded for '.$user->fullName.'.');
     }
 
-    public function timeOut(Request $request, User $user, AttendanceRules $rules, OfficerLocationService $locations): RedirectResponse
+    public function timeOut(Request $request, User $user, EnforcerDuty $duty): RedirectResponse
     {
         $this->ensureAssignedEnforcer($request, $user);
 
-        $attendance = $user->enforcerAttendances()->whereDate('attendance_date', $rules->date())->whereNotNull('time_in')->whereNull('time_out')->latest('time_in')->first()
-            ?? EnforcerAttendance::where('user_id', $user->id)->whereDate('attendance_date', $rules->date())->latest('time_in')->orderByDesc('id')->first();
-        if ($error = $rules->timeOutError($user)) {
-            return back()->with('enforcer_attendance_error', $error);
+        try {
+            $duty->timeOut($user, recordedBySupervisor: $request->user()->id);
+        } catch (ValidationException $exception) {
+            return back()->with('enforcer_attendance_error', $exception->getMessage());
         }
-
-        if (! $attendance?->time_in) {
-            return back()->with('enforcer_attendance_error', $user->fullName.' must time in before timing out.');
-        }
-        if ($attendance->time_out) {
-            return back()->with('enforcer_attendance_error', $user->fullName.' has already timed out today.');
-        }
-        $attendance->update(['supervisor_id' => $request->user()->id, 'time_out' => now()]);
-        $locations->stopSharing($user);
 
         return back()->with('enforcer_attendance_success', 'Time out recorded for '.$user->fullName.'.');
     }

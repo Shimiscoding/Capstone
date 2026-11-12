@@ -25,7 +25,7 @@ class AnalyticsReport
             'date_from' => 'exclude_unless:summary,custom|required|date_format:Y-m-d|before_or_equal:'.$now->format('Y-m-d'),
             'date_to' => 'exclude_unless:summary,custom|required|date_format:Y-m-d|after_or_equal:date_from|before_or_equal:'.$now->format('Y-m-d'),
             'status' => 'nullable|in:paid,unpaid',
-            'vehicle' => 'nullable|string|max:100',
+            'vehicle' => 'nullable|string|max:1000',
         ], [
             'date_from.required' => 'Choose a start date for the custom period.',
             'date_to.required' => 'Choose an end date for the custom period.',
@@ -52,7 +52,7 @@ class AnalyticsReport
             : $now->copy();
         $toStorage = fn (Carbon $date) => $date->copy()->setTimezone(config('app.timezone'));
         $base = Violation::query()
-            ->when($vehicle !== '', fn ($q) => $q->where('vehicle_type', $vehicle))
+            ->when($vehicle !== '', fn ($q) => $q->where('vehicle_type_key', Violation::makeVehicleTypeKey($vehicle)))
             ->when($status === 'paid', fn ($q) => $q->where('status', 'paid'))
             ->when($status === 'unpaid', fn ($q) => $q->where(fn ($q) => $q->where('status', '!=', 'paid')->orWhereNull('status')));
         $tickets = (clone $base)->whereBetween('created_at', [$toStorage($start), $toStorage($end)]);
@@ -117,8 +117,17 @@ class AnalyticsReport
             ->groupBy('options.id', 'options.label')->orderByDesc('total')->orderBy('options.label')->get();
         $page = max(1, min((int) $request->integer('page', 1), max(1, (int) ceil($violationTrends->count() / 10))));
         $violationPage = new LengthAwarePaginator($violationTrends->forPage($page, 10)->values(), $violationTrends->count(), 10, $page, ['path' => $request->url(), 'query' => $request->except('page')]);
-        $vehicleTrends = (clone $tickets)->withoutEagerLoads()->selectRaw('vehicle_type, COUNT(*) as total')
-            ->groupBy('vehicle_type')->orderByDesc('total')->orderBy('vehicle_type')->get();
+        $vehicleGroups = (clone $tickets)->selectRaw('MIN(id) as representative_id, COUNT(*) as total')
+            ->groupBy('vehicle_type_key')->toBase();
+        $vehicleTrends = Violation::query()->withoutEagerLoads()
+            ->joinSub($vehicleGroups, 'vehicle_groups', 'Ticket_issued.id', '=', 'vehicle_groups.representative_id')
+            ->get(['Ticket_issued.vehicle_type', 'vehicle_groups.total'])
+            ->sortBy([['total', 'desc'], ['vehicle_type', 'asc']])->values();
+        $vehicleOptionIds = Violation::query()->whereNotNull('vehicle_type_key')
+            ->where('vehicle_type_key', '!=', Violation::makeVehicleTypeKey(''))
+            ->selectRaw('MIN(id)')->groupBy('vehicle_type_key')->toBase();
+        $vehicleOptions = Violation::query()->whereIn('id', $vehicleOptionIds)->pluck('vehicle_type')
+            ->sort(SORT_STRING | SORT_FLAG_CASE)->values();
         $enforcerTrends = (clone $tickets)->selectRaw('enforcer_id, COUNT(*) as total')
             ->whereHas('enforcer', fn ($q) => $q->where('role', User::ROLE_OFFICER))
             ->withOnly('enforcer')->groupBy('enforcer_id')->orderByDesc('total')->orderBy('enforcer_id')->limit(5)->get();
@@ -139,7 +148,7 @@ class AnalyticsReport
             'dateFrom' => $range === 'custom' || $filterErrors->has('date_from') ? ($input['date_from'] ?? '') : $start->format('Y-m-d'),
             'dateTo' => $range === 'custom' || $filterErrors->has('date_to') ? ($input['date_to'] ?? '') : $end->format('Y-m-d'),
             'statusFilter' => $status, 'vehicleFilter' => $vehicle, 'filterErrors' => $filterErrors,
-            'vehicleOptions' => Violation::query()->whereNotNull('vehicle_type')->where('vehicle_type', '!=', '')->distinct()->orderBy('vehicle_type')->pluck('vehicle_type'),
+            'vehicleOptions' => $vehicleOptions,
             'violationTrends' => $violationTrends, 'violationPage' => $violationPage,
             'vehicleTrends' => $vehicleTrends, 'locationTrends' => $locationTrends,
             'enforcerTrends' => $enforcerTrends, 'aging' => collect(array_values($aging)),

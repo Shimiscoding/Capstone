@@ -24,6 +24,10 @@ class User extends Authenticatable
 
     public const ROLE_CASHIER = 'cashier';
 
+    public const MOBILE_TOKEN_NAME = 'android-app';
+
+    public const MAX_ASSIGNED_AREAS = 5;
+
     public const ROLES = [
         self::ROLE_ADMIN,
         self::ROLE_OFFICER,
@@ -58,6 +62,7 @@ class User extends Authenticatable
         'username',
         'address',
         'area',
+        'additional_areas',
         'supervisor_id',
         'phoneNumber',
         'signature',
@@ -70,10 +75,6 @@ class User extends Authenticatable
         'attendance_time_out_start',
         'attendance_time_out_end',
         'attendance_working_days',
-        'attendance_afternoon_time_in_start',
-        'attendance_afternoon_time_in_end',
-        'attendance_afternoon_time_out_start',
-        'attendance_afternoon_time_out_end',
         'password',
     ];
 
@@ -89,10 +90,20 @@ class User extends Authenticatable
     {
         return [
             'password' => 'hashed',
+            'additional_areas' => 'array',
             'attendance_restrictions_enabled' => 'boolean',
             'attendance_working_days' => 'array',
             'signature' => 'encrypted',
         ];
+    }
+
+    public function assignedAreas(): array
+    {
+        $primary = trim((string) $this->area);
+
+        return $primary === ''
+            ? []
+            : [$primary, ...($this->additional_areas ?? [])];
     }
 
     public function getProfilePhotoUrlAttribute(): ?string
@@ -147,11 +158,12 @@ class User extends Authenticatable
 
     public function effectiveAccountStatus(): string
     {
-        if (in_array($this->account_status, [self::STATUS_INACTIVE, self::STATUS_SUSPENDED, self::STATUS_BANNED], true)) {
-            return $this->account_status;
-        }
-
         return $this->account_status ?: self::STATUS_ACTIVE;
+    }
+
+    public function isAccountUnavailable(): bool
+    {
+        return in_array($this->effectiveAccountStatus(), [self::STATUS_INACTIVE, self::STATUS_SUSPENDED, self::STATUS_BANNED], true);
     }
 
     public function supervisor(): BelongsTo
@@ -162,11 +174,6 @@ class User extends Authenticatable
     public function enforcers(): HasMany
     {
         return $this->hasMany(self::class, 'supervisor_id');
-    }
-
-    public function supervisorAttendances(): HasMany
-    {
-        return $this->hasMany(SupervisorAttendance::class);
     }
 
     public function enforcerAttendances(): HasMany
@@ -194,9 +201,13 @@ class User extends Authenticatable
         return $this->hasMany(OfficerLocationHistory::class);
     }
 
-    public function isOnDuty(): bool
+    public function openAttendances(): HasMany
     {
-        return $this->isOfficer() && $this->enforcerAttendances()
-            ->whereNotNull('time_in')->whereNull('time_out')->exists();
+        return $this->enforcerAttendances()->whereNotNull('time_in')->whereNull('time_out');
+    }
+
+    public function isOnDuty(string $date): bool
+    {
+        return $this->isOfficer() && $this->openAttendances()->whereDate('attendance_date', $date)->exists();
     }
 }

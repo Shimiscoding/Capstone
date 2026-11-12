@@ -4,16 +4,37 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\Settings;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Laravel\Sanctum\PersonalAccessToken;
 
 class AuthController extends Controller
 {
+    public function sendPasswordResetLink(Request $request): JsonResponse
+    {
+        $credentials = $request->validate(['email' => ['required', 'email', 'max:255']]);
+
+        Password::sendResetLink($credentials + ['role' => User::ROLE_OFFICER]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'If this email is registered, password reset instructions will be sent.',
+        ]);
+    }
+
     public function logout(Request $request): JsonResponse
     {
-        $request->user()->currentAccessToken()?->delete();
+        $token = $request->user()->currentAccessToken();
+        if ($token instanceof PersonalAccessToken) {
+            $token->delete();
+        }
 
         return response()->json(['success' => true, 'message' => 'Logged out successfully.']);
     }
@@ -41,12 +62,13 @@ class AuthController extends Controller
         ]);
     }
 
-    public function login(Request $request): JsonResponse
+    public function login(Request $request, Settings $settings): JsonResponse
     {
         $validated = $request->validate([
             'login' => [
                 'required',
                 'string',
+                'max:255',
             ],
             'password' => [
                 'required',
@@ -54,50 +76,50 @@ class AuthController extends Controller
             ],
         ]);
 
-        // Find user using username or email.
-        $user = User::where('email', $validated['login'])
-            ->orWhere('username', $validated['login'])
-            ->first();
+        $login = $validated['login'];
+        $user = User::where('email', $login)->orWhere('username', $login)->first();
+        $identity = $user ? 'user:'.$user->id : 'login:'.hash('sha256', Str::lower($login));
+        $key = 'mobile-login:'.$identity.'|'.$request->ip();
+        if (RateLimiter::tooManyAttempts($key, (int) $settings->get('security.login_attempts'))) {
+            $retryAfter = RateLimiter::availableIn($key);
 
-        // Check whether the account and password are correct.
-        if (
-            ! $user ||
-            ! Hash::check($validated['password'], $user->password)
-        ) {
-            throw ValidationException::withMessages([
-                'login' => [
-                    'Invalid username, email, or password.',
-                ],
-            ]);
-        }
-
-        // Mobile access is available to enforcement officers.
-        if (in_array($user->effectiveAccountStatus(), [User::STATUS_INACTIVE, User::STATUS_SUSPENDED, User::STATUS_BANNED], true)) {
-            return response()->json(['success' => false, 'message' => 'This account is '.$user->effectiveAccountStatus().'. Contact an administrator for assistance.'], 403);
-        }
-        if ($user->role !== User::ROLE_OFFICER) {
             return response()->json([
-                'success' => false,
-                'message' => 'Only officer accounts can use the mobile app.',
-            ], 403);
+                'message' => "Too many login attempts. Try again in {$retryAfter} seconds.",
+            ], 429, ['Retry-After' => $retryAfter]);
         }
 
-        // Remove previous mobile tokens.
-        $user->tokens()
-            ->where('name', 'android-app')
-            ->delete();
+        RateLimiter::hit($key, 60);
+        $response = DB::transaction(function () use ($user, $validated): JsonResponse {
+            // Serialize credential checks and token replacement with password resets and logins.
+            $user = $user === null ? null : User::query()->lockForUpdate()->find($user->id);
+            if (! $user || ! Hash::check($validated['password'], $user->password)) {
+                throw ValidationException::withMessages(['login' => ['Invalid username, email, or password.']]);
+            }
+            if ($user->isAccountUnavailable()) {
+                return response()->json(['success' => false, 'message' => 'This account is '.$user->effectiveAccountStatus().'. Contact an administrator for assistance.'], 403);
+            }
+            if (! $user->isOfficer()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Only officer accounts can use the mobile app.',
+                ], 403);
+            }
 
-        // Create a new mobile API token.
-        $token = $user
-            ->createToken('android-app')
-            ->plainTextToken;
+            $user->tokens()->where('name', User::MOBILE_TOKEN_NAME)->delete();
+            $token = $user->createToken(User::MOBILE_TOKEN_NAME)->plainTextToken;
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Login successful.',
-            'token' => $token,
-            'user' => $this->mobileUser($user),
-        ]);
+            return response()->json([
+                'success' => true,
+                'message' => 'Login successful.',
+                'token' => $token,
+                'user' => $this->mobileUser($user),
+            ]);
+        });
+        if ($response->isSuccessful()) {
+            RateLimiter::clear($key);
+        }
+
+        return $response;
     }
 
     private function mobileUser(User $user): array
@@ -117,6 +139,7 @@ class AuthController extends Controller
             'email' => $user->email,
             'role' => $user->role,
             'signature' => $user->signature,
+            'profile_photo_url' => $user->profile_photo_url,
         ];
     }
 }

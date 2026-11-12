@@ -111,7 +111,7 @@ class ExampleTest extends TestCase
         ]);
         $this->actingAs($user)->get(route('dashboard'))
             ->assertOk()
-            ->assertSee('Tickets issued')
+            ->assertSee('Issued tickets')
             ->assertSee('Illegal parking')
             ->assertSee('ABC 123');
     }

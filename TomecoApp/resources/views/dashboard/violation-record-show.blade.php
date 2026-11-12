@@ -61,7 +61,7 @@
                 <dd>
                     @if ($signatureSource)
                         <img src="{{ $signatureSource }}" alt="{{ $motoristName }} signature">
-                        <small>Captured for ticket #{{ str_pad((string) $signedViolation->id, 7, '0', STR_PAD_LEFT) }}</small>
+                        <small>Captured for ticket {{ $signedViolation->display_ticket_number }}</small>
                     @else
                         <span class="signature-empty">Not recorded</span>
                     @endif
@@ -78,7 +78,7 @@
                     @foreach ($motoristViolations as $record)
                         @php($enforcerSignature = \App\Support\SignatureImage::source($record->enforcer_signature))
                         <tr>
-                            <td><div class="user-cell"><span class="table-avatar">T</span><span><strong>#{{ str_pad((string) $record->id, 7, '0', STR_PAD_LEFT) }}</strong><small>{{ $record->created_at?->format('h:i A') }}</small></span></div></td>
+                            <td><div class="user-cell"><span class="table-avatar">T</span><span><strong>{{ $record->display_ticket_number }}</strong><small>{{ $record->created_at?->format('h:i A') }}</small></span></div></td>
                             <td><strong>{{ $record->violation_type ?: '—' }}</strong></td>
                             <td><span class="badge-number">{{ $record->plate_number ?: '—' }}</span></td>
                             <td><span class="violation-permit-cell"><span>OR: {{ $record->or_number ?: '—' }}</span><small>CR: {{ $record->cr_number ?: '—' }}</small></span></td>

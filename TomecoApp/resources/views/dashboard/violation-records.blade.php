@@ -38,14 +38,14 @@
         @forelse($violations as $violation)
             @php($issued = $violation->created_at?->copy()->setTimezone('Asia/Manila'))
             <tr>
-                <td><a class="ticket-id" href="{{ route('dashboard.violation-records.show', $violation) }}" aria-label="View complete ticket {{ $violation->id }}">#{{ str_pad((string)$violation->id,7,'0',STR_PAD_LEFT) }}</a><small>{{ $issued?->format('h:i A') ?? '—' }}</small></td>
+                <td><a class="ticket-id" href="{{ route('dashboard.violation-records.show', $violation) }}" aria-label="View complete ticket {{ $violation->display_ticket_number }}">{{ $violation->display_ticket_number }}</a><small>{{ $issued?->format('h:i A') ?? '—' }}</small></td>
                 <td><a class="driver-name" href="{{ route('dashboard.violation-records.motorist', $violation) }}">{{ $violation->full_name ?: 'Unknown driver' }}</a><small>{{ $violation->license_number ?: 'No permit recorded' }}</small></td>
                 <td><span class="plate">{{ $violation->plate_number ?: '—' }}</span><small>{{ $violation->vehicle_type ?: 'Not specified' }}</small></td>
                 <td><strong>{{ $violation->violation_type ?: 'Not recorded' }}</strong><small>{{ $violation->location ?: 'Location not recorded' }}</small></td>
                 <td><strong>{{ $violation->enforcer_name ?: $violation->enforcer?->fullName ?: 'Not recorded' }}</strong><small>{{ filled($violation->enforcer_signature) ? 'Signature recorded' : 'Signature missing' }}</small></td>
                 <td>{{ $issued?->format('M d, Y') ?? '—' }}</td>
                 <td class="amount-column"><strong>₱{{ number_format($violation->fine_amount,2) }}</strong><br><span class="status-pill {{ $violation->status === 'paid' ? '' : 'is-unpaid' }}">{{ ucfirst($violation->status ?: 'unpaid') }}</span></td>
-                <td class="action-column"><a class="button view-ticket" href="{{ route('dashboard.violation-records.show', $violation) }}" aria-label="View Ticket {{ $violation->id }}">View Ticket</a></td>
+                <td class="action-column"><a class="button view-ticket" href="{{ route('dashboard.violation-records.show', $violation) }}" aria-label="View Ticket {{ $violation->display_ticket_number }}">View Ticket</a></td>
             </tr>
         @empty<tr><td colspan="8" class="empty-row"><strong>No violation records found</strong><p>Try a different search or use Reset to see this month’s tickets.</p></td></tr>@endforelse
         </tbody></table>

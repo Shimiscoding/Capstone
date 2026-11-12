@@ -12,6 +12,7 @@ class ProfilePhotoController extends Controller
     public function show(Request $request, User $user)
     {
         $viewer = $request->user();
+        abort_if($viewer->isAccountUnavailable(), 403, 'This account is unavailable. Contact an administrator.');
         abort_unless($viewer->is($user) || $viewer->isAdmin()
             || ($viewer->isSupervisor() && $user->isOfficer() && $user->supervisor_id === $viewer->id), 403);
         abort_unless($user->profile_photo_path && Storage::disk('local')->exists($user->profile_photo_path), 404);

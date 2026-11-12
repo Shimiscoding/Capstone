@@ -22,5 +22,5 @@
         <div class="success-message" role="status">{{ session('attendance_success') }}</div>
     @endif
 
-    <x-attendance-history-table :staff="$enforcer" :attendances="$attendances" :enforcer="true" />
+    <x-attendance-history-table :staff="$enforcer" :attendances="$attendances" />
 @endsection

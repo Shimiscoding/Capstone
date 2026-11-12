@@ -1,12 +1,23 @@
 @extends('layouts.admin-dashboard')
-@section('title', 'Violation ticket #'.str_pad((string) $violation->id, 7, '0', STR_PAD_LEFT))
+@section('title', 'Violation ticket '.$violation->display_ticket_number)
 @section('activePage', 'violation-records')
 @section('workspaceClass', 'workspace-full-width')
 
 @section('content')
 @php
-    $ticketNumber = '#'.str_pad((string) $violation->id, 7, '0', STR_PAD_LEFT);
+    $ticketNumber = $violation->display_ticket_number;
     $permitType = match ($violation->license_type) { 'professional' => 'Professional', 'non_professional' => 'Non-professional', 'student_permit' => 'Student permit', default => 'Not specified' };
+    $issued = $violation->created_at?->copy()->setTimezone('Asia/Manila');
+    $accident = match ($violation->accident_involved) {
+        true => 'Yes',
+        false => 'No',
+        default => 'Not recorded',
+    };
+    $driverResponse = match ($violation->driver_response) {
+        'admitted' => 'Admitted',
+        'under_protest' => 'Under Protest',
+        default => 'Not recorded',
+    };
     $imageSource = static function (?string $value): ?string {
         $value = trim((string) $value);
         if ($value === '') return null;
@@ -34,6 +45,8 @@
             <div><dt>Full name</dt><dd>{{ $violation->full_name ?: 'Not recorded' }}</dd></div><div><dt>D/L permit number</dt><dd>{{ $violation->license_number ?: 'Not recorded' }}</dd></div>
             <div><dt>First name</dt><dd>{{ $violation->first_name ?: '—' }}</dd></div><div><dt>Middle name</dt><dd>{{ $violation->middle_name ?: '—' }}</dd></div>
             <div><dt>Last name</dt><dd>{{ $violation->last_name ?: '—' }}</dd></div><div><dt>Permit type</dt><dd>{{ $permitType }}</dd></div>
+            <div><dt>License expiration</dt><dd>{{ $violation->license_expiration_date ? \Illuminate\Support\Carbon::parse($violation->license_expiration_date)->format('M d, Y') : 'Not recorded' }}</dd></div>
+            <div><dt>Driver address</dt><dd>{{ $violation->driver_address ?: 'Not recorded' }}</dd></div>
         </dl></section>
         <section class="violation-detail-card"><header class="violation-detail-section-head"><h2>Vehicle documents</h2></header><dl class="violation-detail-list">
             <div><dt>Observed plate</dt><dd>{{ $violation->plate_number ?: 'Not recorded' }}</dd></div><div><dt>Document plate</dt><dd>{{ $violation->registration_plate_number ?: 'Not recorded' }}</dd></div>
@@ -71,7 +84,9 @@
                 Not recorded
             @endforelse
         </dd></div><div class="violation-fine-row"><dt>Assessed fine</dt><dd>&#8369;{{ number_format($violation->fine_amount, 2) }}</dd></div>
-        <div><dt>Issued</dt><dd>{{ $violation->created_at?->format('M d, Y · h:i A') ?? 'Not recorded' }}</dd></div><div><dt>Location</dt><dd>{{ $violation->location ?: 'Not recorded' }}</dd></div>
+        <div><dt>Issued</dt><dd>{{ $issued?->format('M d, Y · h:i A') ?? 'Not recorded' }}</dd></div><div><dt>Location</dt><dd>{{ $violation->location ?: 'Not recorded' }}</dd></div>
+        <div><dt>Accident</dt><dd>{{ $accident }}</dd></div>
+        <div><dt>Driver response</dt><dd>{{ $driverResponse }}</dd></div>
         <div><dt>Issuing enforcer</dt><dd>{{ $violation->enforcer_name ?: $violation->enforcer?->fullName ?: 'Not recorded' }}</dd></div>
     </dl></aside>
 </div>

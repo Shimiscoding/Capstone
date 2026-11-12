@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Models\AuditLog;
 use App\Models\EnforcerAttendance;
 use App\Models\Setting;
-use App\Models\SupervisorAttendance;
 use App\Models\TicketViolationItem;
 use App\Models\User;
 use App\Models\Violation;
@@ -29,12 +28,12 @@ class AuditLogger
         ViolationType::class,
         Setting::class,
         EnforcerAttendance::class,
-        SupervisorAttendance::class,
     ];
 
     private const EXCLUDED_FIELDS = [
         'password',
         'remember_token',
+        'vehicle_type_key',
         'created_at',
         'updated_at',
     ];
@@ -99,7 +98,6 @@ class AuditLogger
             $model instanceof ViolationType => $model->description,
             $model instanceof Setting => Str::headline(Str::after($model->key, '.')).' setting',
             $model instanceof EnforcerAttendance => 'Officer attendance #'.$model->getKey(),
-            $model instanceof SupervisorAttendance => 'Supervisor attendance #'.$model->getKey(),
             default => class_basename($model).' #'.$model->getKey(),
         };
     }

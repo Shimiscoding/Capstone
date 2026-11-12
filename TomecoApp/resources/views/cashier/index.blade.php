@@ -36,7 +36,7 @@
                 <tbody>
                     @forelse ($tickets as $ticket)
                         <tr>
-                            <th scope="row" class="cashier-ticket-id">#{{ str_pad((string) $ticket->id, 7, '0', STR_PAD_LEFT) }}</th>
+                            <th scope="row" class="cashier-ticket-id">{{ $ticket->display_ticket_number }}</th>
                             <td>{{ $ticket->full_name ?: 'Not recorded' }}</td>
                             <td>{{ $ticket->plate_number ?: 'Not recorded' }}</td>
                             <td>{{ $ticket->violation_type ?: 'Not recorded' }}</td>

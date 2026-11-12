@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Models\EnforcerAttendance;
-use App\Models\SupervisorAttendance;
 use App\Models\User;
 use App\Notifications\UserActivityNotification;
 use App\Notifications\UserCreatedNotification;
@@ -449,9 +448,6 @@ class UserManagementTest extends TestCase
             ->get(route('dashboard'))
             ->assertOk()
             ->assertSee('Supervisor workspace')
-            ->assertSee('Time In and Time Out')
-            ->assertSee(route('supervisor.time-in'))
-            ->assertSee(route('supervisor.time-out'))
             ->assertSee('Assigned Officer')
             ->assertDontSee('Manage users');
 
@@ -460,41 +456,10 @@ class UserManagementTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_supervisor_can_time_in_and_time_out_only_once_per_day(): void
-    {
-        $supervisor = User::factory()->create([
-            'role' => User::ROLE_SUPERVISOR,
-            'attendance_restrictions_enabled' => true,
-            'attendance_time_in_start' => '00:00',
-            'attendance_time_in_end' => '23:59',
-            'attendance_time_out_start' => '00:00',
-            'attendance_time_out_end' => '23:59',
-            'attendance_working_days' => ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
-        ]);
-
-        $this->actingAs($supervisor)->post(route('supervisor.time-in'))->assertRedirect();
-        $attendance = SupervisorAttendance::where('user_id', $supervisor->id)->firstOrFail();
-        $this->assertNotNull($attendance->time_in);
-        $this->assertNull($attendance->time_out);
-
-        $this->actingAs($supervisor)->post(route('supervisor.time-out'))->assertRedirect();
-        $this->assertNotNull($attendance->fresh()->time_out);
-        $this->assertSame(1, SupervisorAttendance::where('user_id', $supervisor->id)->count());
-
-        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
-        $this->actingAs($admin)->post(route('supervisor.time-in'))->assertForbidden();
-    }
-
     public function test_admin_dashboard_does_not_show_supervisor_attendance_table(): void
     {
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
         $supervisor = User::factory()->create(['role' => User::ROLE_SUPERVISOR, 'fullName' => 'Attendance Supervisor']);
-        SupervisorAttendance::create([
-            'user_id' => $supervisor->id,
-            'attendance_date' => today(),
-            'time_in' => now()->subHours(8),
-            'time_out' => now(),
-        ]);
 
         $this->actingAs($admin)
             ->get(route('dashboard'))
@@ -530,24 +495,6 @@ class UserManagementTest extends TestCase
 
         $response = $this->actingAs($admin)->get(route('dashboard.attendance'));
         $this->assertSame(1, substr_count($response->getContent(), 'Unique Attendance User'));
-    }
-
-    public function test_admin_can_open_all_timestamps_for_a_specific_supervisor(): void
-    {
-        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
-        $supervisor = User::factory()->create(['role' => User::ROLE_SUPERVISOR, 'fullName' => 'Timestamp Supervisor']);
-        SupervisorAttendance::create(['user_id' => $supervisor->id, 'attendance_date' => today(), 'time_in' => now()->subHour(), 'time_out' => now()]);
-
-        $this->actingAs($admin)
-            ->get(route('dashboard.attendance.supervisor', $supervisor))
-            ->assertOk()
-            ->assertSee('Timestamp Supervisor')
-            ->assertSee('Complete Time In and Time Out timestamp history')
-            ->assertSee('Completed');
-
-        $this->actingAs($supervisor)
-            ->get(route('dashboard.attendance.supervisor', $supervisor))
-            ->assertForbidden();
     }
 
     public function test_supervisor_can_manage_only_available_enforcers_on_their_team(): void

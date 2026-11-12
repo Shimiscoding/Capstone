@@ -30,6 +30,24 @@ class PasswordResetTest extends TestCase
         Notification::assertSentTo($user, ResetPassword::class);
     }
 
+    public function test_mobile_reset_uses_the_existing_broker_without_disclosing_accounts(): void
+    {
+        Notification::fake();
+        $officer = User::factory()->create(['role' => User::ROLE_OFFICER]);
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $endpoint = '/api/auth/forgot-password';
+
+        $accepted = $this->postJson($endpoint, ['email' => $officer->email])->assertOk()->assertJsonPath('success', true)->json();
+        $this->postJson($endpoint, ['email' => 'unknown@example.test'])->assertOk()->assertExactJson($accepted);
+        $this->postJson($endpoint, ['email' => $admin->email])->assertOk()->assertExactJson($accepted);
+        $this->postJson($endpoint, ['email' => $officer->email])->assertOk()->assertExactJson($accepted);
+        $this->postJson($endpoint, ['email' => 'invalid'])->assertUnprocessable()->assertJsonValidationErrors('email');
+        $this->postJson($endpoint, ['email' => $officer->email])->assertTooManyRequests();
+
+        Notification::assertSentToTimes($officer, ResetPassword::class, 1);
+        Notification::assertNotSentTo($admin, ResetPassword::class);
+    }
+
     public function test_reset_page_preserves_link_details_and_configured_password_minimum(): void
     {
         app(Settings::class)->putMany(['security.password_min_length' => 12]);
@@ -48,7 +66,9 @@ class PasswordResetTest extends TestCase
     public function test_password_can_be_reset_with_a_valid_token(): void
     {
         Notification::fake();
-        $user = User::factory()->create();
+        $user = User::factory()->create(['role' => User::ROLE_OFFICER]);
+        $mobileToken = $user->createToken(User::MOBILE_TOKEN_NAME)->accessToken;
+        $otherToken = $user->createToken('other-client')->accessToken;
 
         $this->post(route('password.email'), ['email' => $user->email]);
 
@@ -62,5 +82,8 @@ class PasswordResetTest extends TestCase
 
             return Hash::check('new-password', $user->fresh()->password);
         });
+
+        $this->assertModelMissing($mobileToken);
+        $this->assertModelExists($otherToken);
     }
 }

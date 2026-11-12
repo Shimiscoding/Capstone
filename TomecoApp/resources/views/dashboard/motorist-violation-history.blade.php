@@ -39,7 +39,7 @@
             <tbody>
                 @foreach ($motoristViolations as $record)
                     <tr>
-                        <td><a class="ticket-link" href="{{ route('dashboard.violation-records.show', $record) }}">#{{ str_pad((string) $record->id, 7, '0', STR_PAD_LEFT) }}</a><small>{{ $record->created_at?->format('h:i A') }}</small></td>
+                        <td><a class="ticket-link" href="{{ route('dashboard.violation-records.show', $record) }}">{{ $record->display_ticket_number }}</a><small>{{ $record->created_at?->format('h:i A') }}</small></td>
                         <td><strong>{{ $record->violation_type ?: 'Not recorded' }}</strong></td>
                         <td><strong class="badge-number">{{ $record->plate_number ?: '—' }}</strong><small>{{ $record->vehicle_type ?: 'Not specified' }}</small></td>
                         <td><span>OR: {{ $record->or_number ?: '—' }}</span><small>CR: {{ $record->cr_number ?: '—' }}</small></td>
@@ -47,7 +47,7 @@
                         <td><strong>{{ $record->enforcer_name ?: $record->enforcer?->fullName ?: 'Not recorded' }}</strong><small>{{ filled($record->enforcer_signature) ? 'Signature recorded' : 'Signature missing' }}</small></td>
                         <td>{{ $record->created_at?->format('M d, Y') ?? '—' }}</td>
                         <td><div class="motorist-fine-status"><strong>&#8369;{{ number_format($record->fine_amount, 2) }}</strong><span class="status-badge {{ $record->status === 'paid' ? '' : 'status-pending' }}">{{ ucfirst($record->status ?: 'unpaid') }}</span></div></td>
-                        <td class="actions-column"><a class="row-view-action" href="{{ route('dashboard.violation-records.show', $record) }}" aria-label="View ticket #{{ str_pad((string) $record->id, 7, '0', STR_PAD_LEFT) }}">View</a></td>
+                        <td class="actions-column"><a class="row-view-action" href="{{ route('dashboard.violation-records.show', $record) }}" aria-label="View ticket {{ $record->display_ticket_number }}">View</a></td>
                     </tr>
                 @endforeach
             </tbody>

@@ -6,15 +6,17 @@ use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CashierDashboardController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DashboardNotificationController;
 use App\Http\Controllers\DashboardSearchController;
 use App\Http\Controllers\EnforcerAttendanceController;
 use App\Http\Controllers\LocationMonitoringController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProfilePhotoController;
 use App\Http\Controllers\SettingsController;
-use App\Http\Controllers\SupervisorAttendanceController;
+use App\Http\Controllers\StaffController;
 use App\Http\Controllers\SupervisorTeamController;
 use App\Http\Controllers\TicketEvidenceController;
+use App\Http\Controllers\ViolationRecordsController;
 use App\Http\Middleware\EnsureApiAccountActive;
 use App\Http\Middleware\EnsureUserCanAccessWebsite;
 use Illuminate\Support\Facades\Auth;
@@ -52,7 +54,7 @@ Route::middleware('auth')->group(function (): void {
         Route::get('/dashboard/search', DashboardSearchController::class)->name('dashboard.search');
         Route::get('/dashboard/cashier', [CashierDashboardController::class, 'index'])->name('cashier.dashboard');
         Route::get('/dashboard/audit-logs', [AuditLogController::class, 'index'])->name('dashboard.audit-logs');
-        Route::controller(DashboardController::class)->prefix('dashboard')->name('dashboard.')->group(function (): void {
+        Route::controller(ViolationRecordsController::class)->prefix('dashboard')->name('dashboard.')->group(function (): void {
             Route::get('/analytics', 'analytics')->name('analytics');
             Route::get('/violation-records', 'violationRecords')->name('violation-records');
             Route::get('/violation-records/motorists/{violation}', 'motoristRecord')->name('violation-records.motorist');
@@ -63,6 +65,7 @@ Route::middleware('auth')->group(function (): void {
         Route::controller(LocationMonitoringController::class)->prefix('location-monitoring')->name('location-monitoring.')->group(function (): void {
             Route::get('/', 'index')->name('index');
             Route::get('/officers', 'officers')->name('officers');
+            Route::get('/officers/{officer}', 'details')->name('officers.details');
             Route::get('/officers/{officer}/history', 'history')->name('history');
         });
 
@@ -73,12 +76,8 @@ Route::middleware('auth')->group(function (): void {
             Route::put('/staff/{staff}', 'update')->name('update');
         });
 
-        /* Supervisor attendance and team operations. */
+        /* Enforcer attendance and supervisor team operations. */
         Route::prefix('dashboard/supervisor')->group(function (): void {
-            Route::controller(SupervisorAttendanceController::class)->group(function (): void {
-                Route::post('/time-in', 'timeIn')->name('supervisor.time-in');
-                Route::post('/time-out', 'timeOut')->name('supervisor.time-out');
-            });
             Route::controller(EnforcerAttendanceController::class)->group(function (): void {
                 Route::get('/attendance', 'index')->name('supervisor.enforcers.attendance.index');
                 Route::post('/enforcers/{user}/time-in', 'timeIn')->name('supervisor.enforcers.time-in');
@@ -94,19 +93,16 @@ Route::middleware('auth')->group(function (): void {
 
         /* Admin attendance management. */
         Route::prefix('dashboard/attendance')->group(function (): void {
-            Route::get('/', [DashboardController::class, 'attendance'])->name('dashboard.attendance');
+            Route::get('/', [AdminAttendanceController::class, 'index'])->name('dashboard.attendance');
             Route::put('/users/{user}/restrictions', [AdminAttendanceController::class, 'updateRestrictions'])->name('dashboard.attendance.restrictions.update');
             Route::get('/enforcers/{user}', [EnforcerAttendanceController::class, 'show'])->name('dashboard.attendance.enforcers.show');
-            Route::get('/{user}', [DashboardController::class, 'supervisorAttendance'])->name('dashboard.attendance.supervisor');
-            Route::put('/supervisors/{attendance}/time-out', [AdminAttendanceController::class, 'updateSupervisorTimeOut'])->name('dashboard.attendance.supervisors.time-out');
             Route::put('/enforcers/{attendance}/time-out', [AdminAttendanceController::class, 'updateEnforcerTimeOut'])->name('dashboard.attendance.enforcers.time-out');
-            Route::delete('/supervisors/{attendance}', [AdminAttendanceController::class, 'destroySupervisorAttendance'])->name('dashboard.attendance.supervisors.destroy');
             Route::delete('/enforcers/{attendance}', [AdminAttendanceController::class, 'destroyEnforcerAttendance'])->name('dashboard.attendance.enforcers.destroy');
         });
 
         /* Admin user and team-assignment management. */
         Route::prefix('dashboard/users')->group(function (): void {
-            Route::controller(DashboardController::class)->group(function (): void {
+            Route::controller(StaffController::class)->group(function (): void {
                 Route::get('/supervisors', 'supervisors')->name('dashboard.users.supervisors');
                 Route::get('/enforcers', 'enforcers')->name('dashboard.users.enforcers');
                 Route::get('/admins', 'admins')->name('dashboard.users.admins');
@@ -129,13 +125,13 @@ Route::middleware('auth')->group(function (): void {
         });
 
         /* Authenticated user notifications. */
-        Route::controller(DashboardController::class)->prefix('dashboard/notifications')->group(function (): void {
+        Route::controller(DashboardNotificationController::class)->prefix('dashboard/notifications')->group(function (): void {
             Route::post('/read', 'markNotificationsRead')->name('dashboard.notifications.read');
             Route::get('/feed', 'notificationFeed')->name('dashboard.notifications.feed');
             Route::post('/{notification}/read', 'markNotificationRead')->name('dashboard.notifications.read-one');
             Route::delete('/', 'deleteNotifications')->name('dashboard.notifications.delete');
         });
-        Route::delete('/dashboard/notifications-all', [DashboardController::class, 'deleteAllNotifications'])->name('dashboard.notifications.delete-all');
+        Route::delete('/dashboard/notifications-all', [DashboardNotificationController::class, 'deleteAllNotifications'])->name('dashboard.notifications.delete-all');
 
         /* Admin application settings. */
         Route::controller(SettingsController::class)->prefix('dashboard/settings')->group(function (): void {

@@ -36,7 +36,9 @@ class AreaAssignmentController extends Controller
         if ($area === '__unassigned') {
             $officerQuery->where(fn ($query) => $query->whereNull('area')->orWhere('area', ''));
         } elseif ($area !== '') {
-            $officerQuery->whereRaw('LOWER(TRIM(area)) = ?', [mb_strtolower($area)]);
+            $officerQuery->where(fn ($query) => $query
+                ->whereRaw('LOWER(TRIM(area)) = ?', [mb_strtolower($area)])
+                ->orWhereJsonContains('additional_areas', $area));
         }
 
         $officers = $officerQuery
@@ -45,13 +47,18 @@ class AreaAssignmentController extends Controller
             ->paginate(20)->withQueryString();
 
         $areas = DB::table('operational_areas')->orderBy('name')->pluck('name');
+        $maxAreas = User::MAX_ASSIGNED_AREAS;
 
-        return view('area-assignments.index', compact('officers', 'areas', 'search', 'area', 'canManage', 'type'));
+        return view('area-assignments.index', compact('officers', 'areas', 'search', 'area', 'canManage', 'type', 'maxAreas'));
     }
 
     public function update(UpdateAreaAssignmentRequest $request, User $staff): RedirectResponse
     {
-        $staff->update($request->validated());
+        $areas = array_values(array_filter($request->validated('areas'), fn ($area) => $area !== null));
+        $staff->update([
+            'area' => $areas[0] ?? null,
+            'additional_areas' => count($areas) > 1 ? array_slice($areas, 1) : null,
+        ]);
 
         return back()->with('area_assignment_success', $staff->fullName.' area assignment was updated.');
     }

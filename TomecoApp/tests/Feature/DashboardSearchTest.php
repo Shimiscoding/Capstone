@@ -52,7 +52,7 @@ class DashboardSearchTest extends TestCase
         foreach (['Mara Santos', 'ABC2468', '#'.$ticket->id] as $query) {
             $this->actingAs($admin)->getJson(route('dashboard.search', ['q' => $query]))
                 ->assertOk()->assertJsonFragment([
-                    'kind' => 'Violation records', 'label' => 'Ticket #'.$ticket->id,
+                    'kind' => 'Violation records', 'label' => 'Ticket '.$ticket->display_ticket_number,
                     'description' => 'Mara Santos · ABC-2468',
                     'url' => route('dashboard.violation-records.show', $ticket),
                 ]);

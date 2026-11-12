@@ -4,12 +4,14 @@ namespace Tests\Feature\Api;
 
 use App\Models\User;
 use App\Models\Violation;
+use App\Models\ViolationType;
 use App\Services\TicketEvidence;
 use App\Support\SignatureImage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
+use Mockery;
 use Tests\TestCase;
 
 class MobileContractTest extends TestCase
@@ -45,11 +47,11 @@ class MobileContractTest extends TestCase
     {
         $officer = User::factory()->create(['role' => User::ROLE_OFFICER, 'signature' => self::VECTOR]);
         Sanctum::actingAs($officer);
-        $photos = array_map(fn ($n) => UploadedFile::fake()->image("photo-$n.jpg", 20 + $n, 20), range(1, 5));
+        $photos = array_map(fn ($n) => UploadedFile::fake()->image("TMC-BB10F3D83CBA-evidence-$n.jpg", 20 + $n, 20), range(1, 5));
         $response = $this->post('/api/violations', $this->payload() + ['evidence_images' => $photos], ['Accept' => 'application/json']);
         $response->assertCreated()->assertJsonPath('data.enforcer_id', $officer->id)
             ->assertJsonPath('data.enforcer_signature', self::VECTOR)->assertJsonCount(5, 'data.evidence_images')
-            ->assertJsonMissingPath('data.evidence_image');
+            ->assertJsonMissingPath('data.evidence_image')->assertJsonPath('data.citation_number', 'TMC-BB10F3D83CBA');
         $ticket = Violation::firstOrFail();
         foreach (['or_number', 'cr_number', 'registration_plate_number', 'vehicle_make', 'vehicle_series', 'vehicle_body_type', 'vehicle_year_model', 'registered_owner_name', 'registered_owner_address'] as $field) {
             $this->assertSame($this->payload()[$field], $ticket->$field);
@@ -68,22 +70,31 @@ class MobileContractTest extends TestCase
         $html = $this->actingAs($admin)->get(route('dashboard.violation-records.show', $ticket));
         $html->assertOk()->assertSee('Observed plate')->assertSee('Document plate')->assertSee('Separate Registered Owner')
             ->assertSee('Hilux 2.4 G')->assertSee('Evidence photo 5 of 5')->assertSee(SignatureImage::source(self::VECTOR), false);
-        $html->assertDontSee('data:image/png;base64,Y2hhbmdlZA==', false);
+        $html->assertDontSee('data:image/png;base64,Y2hhbmdlZA==', false)->assertSee('TMC-BB10F3D83CBA');
+        $this->get(route('dashboard.violation-records', ['search' => 'tmc-bb10f3d83cba', 'period' => 'all']))
+            ->assertOk()->assertViewHas('violations', fn ($rows) => $rows->count() === 1)
+            ->assertSee('TMC-BB10F3D83CBA');
+        $this->getJson(route('dashboard.search', ['q' => 'TMC-BB10F3D83CBA']))
+            ->assertOk()->assertJsonFragment(['label' => 'Ticket TMC-BB10F3D83CBA']);
     }
 
     public function test_single_file_and_missing_documents_remain_compatible(): void
     {
         Sanctum::actingAs(User::factory()->create(['role' => User::ROLE_OFFICER, 'signature' => self::VECTOR]));
-        $payload = $this->payload();
+        $payload = $this->payload() + ['citation_number' => 'TMC-111122223333'];
         foreach (['or_number', 'cr_number', 'registration_plate_number', 'registered_owner_name', 'registered_owner_address'] as $field) {
             $payload[$field] = '';
         }
-        $this->post('/api/violations', $payload + ['evidence_image' => UploadedFile::fake()->image('single.png')], ['Accept' => 'application/json'])->assertCreated();
+        $this->post('/api/violations', $payload + ['evidence_image' => UploadedFile::fake()->image('single.png')], ['Accept' => 'application/json'])->assertCreated()
+            ->assertJsonPath('data.citation_number', 'TMC-111122223333');
         $ticket = Violation::firstOrFail();
         $this->assertCount(1, $ticket->evidence_photos);
         $this->assertNull($ticket->registered_owner_name);
         $this->assertNull($ticket->registration_plate_number);
         $this->assertNull($ticket->or_number);
+        $this->post('/api/violations', $payload + ['evidence_image' => UploadedFile::fake()->image('duplicate.png')], ['Accept' => 'application/json'])
+            ->assertUnprocessable()->assertJsonValidationErrors('citation_number');
+        $this->assertDatabaseCount('Ticket_issued', 1);
     }
 
     public function test_invalid_evidence_count_type_and_size_are_rejected(): void
@@ -94,6 +105,116 @@ class MobileContractTest extends TestCase
         }
         $this->assertDatabaseCount('Ticket_issued', 0);
         $this->post('/api/violations', $this->payload() + ['evidence_images' => [UploadedFile::fake()->image('limit.jpg')->size(8192)]], ['Accept' => 'application/json'])->assertCreated();
+    }
+
+    public function test_identical_multipart_retry_returns_original_ticket_and_preserves_details_in_history(): void
+    {
+        $officer = User::factory()->create(['role' => User::ROLE_OFFICER, 'signature' => self::VECTOR]);
+        Sanctum::actingAs($officer);
+        $type = ViolationType::findOrFail(7);
+        $number = 'TMC-ABC123DEF456';
+        $headers = ['Accept' => 'application/json', 'Idempotency-Key' => $number];
+        $payload = array_diff_key($this->payload(), ['violation_type' => true]) + [
+            'citation_number' => $number,
+            'violations' => [['violation_issued_id' => (string) $type->violation_issued_id, 'violations_type_id' => '7']],
+            'license_expiration_date' => '2031-04-20',
+            'driver_address' => '5 Fictional Avenue',
+            'accident_involved' => '0',
+            'driver_response' => 'under_protest',
+            'evidence_photo_count' => '1',
+        ];
+        $post = fn (array $fields, int $width = 20) => $this->post('/api/violations', $fields + [
+            'evidence_images' => [UploadedFile::fake()->image('evidence.jpg', $width, 20)],
+        ], $headers);
+
+        $issued = $post($payload)->assertCreated()->assertJsonPath('data.citation_number', $number)
+            ->assertJsonPath('data.enforcer_id', $officer->id)->assertJsonPath('data.status', 'unpaid')
+            ->assertJsonPath('data.evidence_photo_count', 1)->assertJsonMissingPath('data.submission_fingerprint');
+        $id = $issued->json('data.id');
+        $officer->update(['signature' => null]);
+        $post($payload)->assertOk()->assertJsonPath('data.id', $id)->assertJsonPath('data.enforcer_signature', self::VECTOR);
+        $post(array_replace($payload, ['driver_address' => 'Changed address']))->assertUnprocessable()->assertJsonValidationErrors('citation_number');
+        $post($payload, 21)->assertUnprocessable()->assertJsonValidationErrors('citation_number');
+        $this->assertDatabaseCount('Ticket_issued', 1);
+        $this->assertDatabaseCount('ticket_violation_items', 1);
+        $this->assertCount(1, Storage::disk('local')->allFiles('ticket-evidence'));
+        $ticket = Violation::findOrFail($id);
+        foreach (['driver_address', 'driver_response', 'license_expiration_date'] as $field) {
+            $this->assertNotSame($payload[$field], $ticket->getRawOriginal($field));
+        }
+
+        $this->getJson('/api/violations')->assertOk()->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('meta.current_page', 1)->assertJsonPath('meta.last_page', 1)
+            ->assertJsonPath('data.0.citation_number', $number)->assertJsonPath('data.0.id', $id)
+            ->assertJsonPath('data.0.created_at', $issued->json('data.created_at'))
+            ->assertJsonPath('data.0.license_expiration_date', '2031-04-20')->assertJsonPath('data.0.driver_address', '5 Fictional Avenue')
+            ->assertJsonPath('data.0.accident_involved', false)->assertJsonPath('data.0.driver_response', 'under_protest')
+            ->assertJsonPath('data.0.issued_violations.0.violations_type_id', 7)
+            ->assertJsonPath('data.0.evidence_photo_count', 1)->assertJsonMissingPath('data.0.evidence_images');
+
+        Sanctum::actingAs(User::factory()->create(['role' => User::ROLE_OFFICER]));
+        $post($payload)->assertUnprocessable()->assertJsonValidationErrors('citation_number');
+        $this->getJson('/api/violations')->assertOk()->assertJsonPath('meta.total', 0)->assertJsonCount(0, 'data');
+        Sanctum::actingAs(User::factory()->create(['role' => User::ROLE_ADMIN]));
+        $this->getJson('/api/violations')->assertForbidden();
+    }
+
+    public function test_bad_date_signature_or_missing_multipart_evidence_never_creates_a_ticket(): void
+    {
+        Sanctum::actingAs(User::factory()->create(['role' => User::ROLE_OFFICER]));
+        $number = 'TMC-001122334455';
+        $headers = ['Accept' => 'application/json', 'Idempotency-Key' => $number];
+        $payload = $this->payload() + ['citation_number' => $number, 'evidence_photo_count' => '1'];
+        $this->post('/api/violations', $payload + ['license_expiration_date' => '2031-02-30'], $headers)
+            ->assertUnprocessable()->assertJsonValidationErrors('license_expiration_date');
+        $this->post('/api/violations', $payload, $headers)->assertUnprocessable()
+            ->assertJsonValidationErrors('evidence_images')->assertJsonPath('message', 'One or more evidence photos did not reach the server. Check the attachments and retry.');
+        $this->post('/api/violations', array_replace($payload, ['evidence_photo_count' => '0', 'signature' => 'SIG_VECTOR_V1|0x0|1,2']), $headers)
+            ->assertUnprocessable()->assertJsonValidationErrors('signature');
+        $this->assertDatabaseCount('Ticket_issued', 0);
+        $this->assertCount(0, Storage::disk('local')->allFiles('ticket-evidence'));
+    }
+
+    public function test_missing_details_stay_null_and_unidentified_tickets_are_grouped_separately(): void
+    {
+        Sanctum::actingAs(User::factory()->create(['role' => User::ROLE_OFFICER]));
+        $this->postJson('/api/violations', ['violations' => [['violations_type_id' => 7]], 'fine_amount' => 500])
+            ->assertCreated()->assertJsonPath('data.evidence_photo_count', 0)->assertJsonPath('data.plate_number', null)
+            ->assertJsonPath('data.first_name', null)->assertJsonPath('data.accident_involved', null);
+        $this->postJson('/api/violations', ['violations' => [['violations_type_id' => 7]], 'fine_amount' => 500])
+            ->assertCreated();
+        [$first, $second] = Violation::orderBy('id')->get();
+        $originalKey = $first->motorist_key;
+        $this->assertNotSame($originalKey, $second->motorist_key);
+        $first->update(['status' => 'paid']);
+        $this->assertSame($originalKey, $first->fresh()->motorist_key);
+        $this->getJson('/api/violations')->assertOk()->assertJsonPath('data.1.status', 'paid');
+    }
+
+    public function test_partial_evidence_storage_failure_cleans_up_and_can_be_retried(): void
+    {
+        Sanctum::actingAs(User::factory()->create(['role' => User::ROLE_OFFICER]));
+        $disk = Storage::disk('local');
+        $failingDisk = Mockery::mock();
+        $failingDisk->shouldReceive('put')->once()->andReturnUsing($disk->put(...));
+        $failingDisk->shouldReceive('put')->once()->andReturn(false);
+        $failingDisk->shouldReceive('delete')->andReturnUsing($disk->delete(...));
+        Storage::set('local', $failingDisk);
+
+        $number = 'TMC-FFEEDDCCBBAA';
+        $post = fn () => $this->post('/api/violations', $this->payload() + [
+            'citation_number' => $number,
+            'evidence_photo_count' => '2',
+            'evidence_images' => [UploadedFile::fake()->image('one.jpg'), UploadedFile::fake()->image('two.jpg')],
+        ], ['Accept' => 'application/json', 'Idempotency-Key' => $number]);
+        $post()->assertStatus(503)->assertJsonPath('message', 'An evidence photo could not be saved. Please retry the citation.');
+        $this->assertDatabaseCount('Ticket_issued', 0);
+        $this->assertCount(0, $disk->allFiles('ticket-evidence'));
+
+        Storage::set('local', $disk);
+        $post()->assertCreated()->assertJsonPath('data.evidence_photo_count', 2);
+        $this->assertDatabaseCount('Ticket_issued', 1);
+        $this->assertCount(2, $disk->allFiles('ticket-evidence'));
     }
 
     public function test_bearer_login_profile_and_logout_revoke_only_current_token(): void

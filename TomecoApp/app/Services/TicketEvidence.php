@@ -14,8 +14,14 @@ class TicketEvidence
     public static function store(UploadedFile $photo): string
     {
         $reference = self::PREFIX.Str::uuid();
-        if (! Storage::disk('local')->put(self::path($reference), Crypt::encryptString(file_get_contents($photo->getRealPath())))) {
-            throw new \RuntimeException('Could not save encrypted evidence.');
+        $bytes = file_get_contents($photo->getPathname());
+        abort_if($bytes === false, 503, 'An evidence photo could not be read. Attach it again and retry.');
+
+        $disk = Storage::disk('local');
+        $path = self::path($reference);
+        if (! $disk->put($path, Crypt::encryptString($bytes))) {
+            $disk->delete($path);
+            abort(503, 'An evidence photo could not be saved. Please retry the citation.');
         }
 
         return $reference;

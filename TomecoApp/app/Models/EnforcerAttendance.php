@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -33,6 +34,13 @@ class EnforcerAttendance extends Model
     public function supervisor(): BelongsTo
     {
         return $this->belongsTo(User::class, 'supervisor_id');
+    }
+
+    public function scopeForDutyDate(Builder $query, string $date): Builder
+    {
+        return $query->whereDate('attendance_date', $date)
+            ->orderByRaw('CASE WHEN time_in IS NOT NULL AND time_out IS NULL THEN 0 ELSE 1 END')
+            ->latest('time_in')->orderByDesc('id');
     }
 
     public function dutyLabel(): string

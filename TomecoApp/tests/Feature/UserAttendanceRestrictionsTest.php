@@ -2,26 +2,19 @@
 
 namespace Tests\Feature;
 
-use App\Models\SupervisorAttendance;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 class UserAttendanceRestrictionsTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected function tearDown(): void
-    {
-        Carbon::setTestNow();
-        parent::tearDown();
-    }
-
     public function test_attendance_page_only_lists_enforcers_and_admin_can_save_individual_restrictions(): void
     {
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN, 'fullName' => 'Table Admin']);
-        $supervisor = User::factory()->create(['role' => User::ROLE_SUPERVISOR, 'fullName' => 'Table Supervisor']);
+        User::factory()->create(['role' => User::ROLE_SUPERVISOR, 'fullName' => 'Table Supervisor']);
         $enforcer = User::factory()->create(['role' => User::ROLE_OFFICER, 'fullName' => 'Table Enforcer']);
 
         foreach ([[], ['type' => 'supervisor'], ['type' => 'enforcer'], ['type' => 'admin']] as $filters) {
@@ -35,7 +28,7 @@ class UserAttendanceRestrictionsTest extends TestCase
                 ->assertSeeText('Save restrictions');
         }
 
-        $this->actingAs($admin)->put(route('dashboard.attendance.restrictions.update', $supervisor), [
+        $this->actingAs($admin)->put(route('dashboard.attendance.restrictions.update', $enforcer), [
             'attendance_restrictions_enabled' => '1',
             'attendance_time_in_start' => '07:00',
             'attendance_time_in_end' => '09:00',
@@ -44,49 +37,22 @@ class UserAttendanceRestrictionsTest extends TestCase
             'attendance_working_days' => ['monday', 'tuesday'],
         ])->assertSessionHas('attendance_success');
 
-        $supervisor->refresh();
-        $this->assertTrue($supervisor->attendance_restrictions_enabled);
-        $this->assertSame(['monday', 'tuesday'], $supervisor->attendance_working_days);
+        $enforcer->refresh();
+        $this->assertTrue($enforcer->attendance_restrictions_enabled);
+        $this->assertSame(['monday', 'tuesday'], $enforcer->attendance_working_days);
     }
 
-    public function test_supervisor_time_in_uses_their_individual_restriction(): void
+    public function test_supervisor_attendance_table_and_routes_are_removed(): void
     {
-        Carbon::setTestNow(Carbon::parse('2026-08-17 10:00:00', 'Asia/Manila'));
-        $supervisor = User::factory()->create([
-            'role' => User::ROLE_SUPERVISOR,
-            'attendance_restrictions_enabled' => true,
-            'attendance_time_in_start' => '07:00',
-            'attendance_time_in_end' => '09:00',
-            'attendance_time_out_start' => '16:00',
-            'attendance_time_out_end' => '18:00',
-            'attendance_working_days' => ['monday'],
-        ]);
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $supervisor = User::factory()->create(['role' => User::ROLE_SUPERVISOR]);
 
-        $this->actingAs($supervisor)->post(route('supervisor.time-in'))
-            ->assertSessionHas('attendance_error', 'Time In is only allowed from 07:00 AM to 09:00 AM.');
-
-        $this->assertSame(0, SupervisorAttendance::where('user_id', $supervisor->id)->count());
-    }
-
-    public function test_supervisor_cannot_record_attendance_until_an_admin_sets_restrictions(): void
-    {
-        $supervisor = User::factory()->create([
-            'role' => User::ROLE_SUPERVISOR,
-            'attendance_restrictions_enabled' => false,
-        ]);
-
-        $this->actingAs($supervisor)->get(route('dashboard'))
-            ->assertOk()
-            ->assertSeeText('Assigned enforcers')
-            ->assertDontSeeText('Time In')
-            ->assertDontSeeText('Time Out')
-            ->assertDontSeeText('Ask an administrator to set your attendance schedule');
-
-        $this->actingAs($supervisor)->post(route('supervisor.time-in'))
-            ->assertSessionHas('attendance_error', 'Your attendance schedule has not been set. Please contact an administrator.');
-        $this->actingAs($supervisor)->post(route('supervisor.time-out'))
-            ->assertSessionHas('attendance_error', 'Your attendance schedule has not been set. Please contact an administrator.');
-
-        $this->assertDatabaseMissing('supervisor_attendances', ['user_id' => $supervisor->id]);
+        $this->assertFalse(Schema::hasTable('supervisor_attendances'));
+        $this->assertTrue(Schema::hasTable('enforcer_attendances'));
+        $this->actingAs($supervisor)->post('/dashboard/supervisor/time-in')->assertNotFound();
+        $this->actingAs($supervisor)->post('/dashboard/supervisor/time-out')->assertNotFound();
+        $this->actingAs($admin)->get('/dashboard/attendance/'.$supervisor->id)->assertNotFound();
+        $this->actingAs($admin)->put('/dashboard/attendance/supervisors/1/time-out')->assertNotFound();
+        $this->actingAs($admin)->delete('/dashboard/attendance/supervisors/1')->assertNotFound();
     }
 }

@@ -1,7 +1,6 @@
-@props(['staff', 'attendances', 'enforcer' => false])
+@props(['staff', 'attendances'])
 @php
     $canManage = auth()->user()->isAdmin();
-    $routePrefix = $enforcer ? 'dashboard.attendance.enforcers' : 'dashboard.attendance.supervisors';
 @endphp
 <section class="table-card attendance-records-card">
     <div class="supervisor-list-heading">
@@ -12,7 +11,7 @@
             <caption class="attendance-visually-hidden">Attendance history for {{ $staff->fullName }}</caption>
             <thead><tr>
                 <th scope="col">Date</th>
-                @if ($enforcer)<th scope="col">Duty</th>@endif
+                <th scope="col">Duty</th>
                 <th scope="col">Time in</th><th scope="col">Time out</th><th scope="col">Total hours</th><th scope="col">Status</th>
                 @if ($canManage)<th scope="col">Actions</th>@endif
             </tr></thead>
@@ -20,16 +19,14 @@
                 @forelse ($attendances as $attendance)
                     <tr>
                         <th scope="row"><span class="attendance-cell-value">{{ $attendance->attendance_date->format('M d, Y') }}</span><small class="attendance-cell-detail">{{ $attendance->attendance_date->format('l') }}</small></th>
-                        @if ($enforcer)<td>{{ $attendance->dutyLabel() }}</td>@endif
+                        <td>{{ $attendance->dutyLabel() }}</td>
                         @foreach (['time_in' => 'Time in', 'time_out' => 'Time out'] as $field => $label)
                             <td>
                                 <span class="attendance-cell-value">{{ $attendance->$field?->format('h:i:s A') ?? '—' }}</span>
-                                @if ($enforcer)
-                                    @if ($attendance->{$field.'_latitude'} !== null && $attendance->{$field.'_longitude'} !== null)
-                                        <a class="attendance-cell-detail attendance-map-link" href="https://www.google.com/maps?q={{ $attendance->{$field.'_latitude'} }},{{ $attendance->{$field.'_longitude'} }}" target="_blank" rel="noopener noreferrer" aria-label="{{ $label }} location for {{ $attendance->attendance_date->format('M d, Y') }}, {{ $attendance->dutyLabel() }} duty (opens in a new tab)">Open map</a>
-                                    @else
-                                        <small class="attendance-cell-detail">{{ $attendance->$field ? 'Location unavailable' : 'Not recorded' }}</small>
-                                    @endif
+                                @if ($attendance->{$field.'_latitude'} !== null && $attendance->{$field.'_longitude'} !== null)
+                                    <a class="attendance-cell-detail attendance-map-link" href="https://www.google.com/maps?q={{ $attendance->{$field.'_latitude'} }},{{ $attendance->{$field.'_longitude'} }}" target="_blank" rel="noopener noreferrer" aria-label="{{ $label }} location for {{ $attendance->attendance_date->format('M d, Y') }}, {{ $attendance->dutyLabel() }} duty (opens in a new tab)">Open map</a>
+                                @else
+                                    <small class="attendance-cell-detail">{{ $attendance->$field ? 'Location unavailable' : 'Not recorded' }}</small>
                                 @endif
                             </td>
                         @endforeach
@@ -37,13 +34,13 @@
                         <td><span class="attendance-state {{ $attendance->time_out ? 'is-complete' : 'is-active' }}">{{ $attendance->time_out ? 'Completed' : 'Timed in' }}</span></td>
                         @if ($canManage)
                             <td><div class="attendance-row-actions">
-                                <button type="button" class="attendance-record-button" data-attendance-edit data-url="{{ route($routePrefix.'.time-out', $attendance) }}" data-label="{{ $attendance->attendance_date->format('l, M d, Y') }}{{ $enforcer ? ' · '.$attendance->dutyLabel().' duty' : '' }}" data-time-in="{{ $attendance->time_in?->format('H:i') }}" data-time-out="{{ $attendance->time_out?->format('H:i') }}" aria-label="Edit attendance for {{ $attendance->attendance_date->format('M d, Y') }}{{ $enforcer ? ', '.$attendance->dutyLabel().' duty' : '' }}">Edit</button>
-                                <button type="button" class="attendance-record-button is-danger" data-attendance-delete data-url="{{ route($routePrefix.'.destroy', $attendance) }}" data-label="{{ $attendance->attendance_date->format('l, M d, Y') }}{{ $enforcer ? ' · '.$attendance->dutyLabel().' duty' : '' }}" aria-label="Delete attendance for {{ $attendance->attendance_date->format('M d, Y') }}{{ $enforcer ? ', '.$attendance->dutyLabel().' duty' : '' }}">Delete</button>
+                                <button type="button" class="attendance-record-button" data-attendance-edit data-url="{{ route('dashboard.attendance.enforcers.time-out', $attendance) }}" data-label="{{ $attendance->attendance_date->format('l, M d, Y') }} · {{ $attendance->dutyLabel() }} duty" data-time-in="{{ $attendance->time_in?->format('H:i') }}" data-time-out="{{ $attendance->time_out?->format('H:i') }}" aria-label="Edit attendance for {{ $attendance->attendance_date->format('M d, Y') }}, {{ $attendance->dutyLabel() }} duty">Edit</button>
+                                <button type="button" class="attendance-record-button is-danger" data-attendance-delete data-url="{{ route('dashboard.attendance.enforcers.destroy', $attendance) }}" data-label="{{ $attendance->attendance_date->format('l, M d, Y') }} · {{ $attendance->dutyLabel() }} duty" aria-label="Delete attendance for {{ $attendance->attendance_date->format('M d, Y') }}, {{ $attendance->dutyLabel() }} duty">Delete</button>
                             </div></td>
                         @endif
                     </tr>
                 @empty
-                    <tr><td colspan="{{ 5 + (int) $enforcer + (int) $canManage }}" class="empty-state"><strong>No timestamp records</strong><span>This {{ $enforcer ? 'enforcer' : 'supervisor' }} has not recorded attendance yet.</span></td></tr>
+                    <tr><td colspan="{{ 6 + (int) $canManage }}" class="empty-state"><strong>No timestamp records</strong><span>This enforcer has not recorded attendance yet.</span></td></tr>
                 @endforelse
             </tbody>
         </table>

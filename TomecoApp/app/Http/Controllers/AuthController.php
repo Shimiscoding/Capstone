@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Setting;
 use App\Models\User;
 use App\Services\Settings;
 use Illuminate\Auth\Events\PasswordReset;
@@ -9,6 +10,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Password as PasswordBroker;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
@@ -20,14 +22,14 @@ class AuthController extends Controller
     public function showLogin(Settings $settings): Response
     {
         return response()
-            ->view('auth.login', ['adminSignupEnabled' => (bool) $settings->get('security.admin_signup_enabled', true)])
+            ->view('auth.login', ['adminSignupEnabled' => $settings->allowsAdminSignup()])
             ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
             ->header('Pragma', 'no-cache');
     }
 
     public function showRegister(Settings $settings): View
     {
-        abort_unless($settings->get('security.admin_signup_enabled', true), 404);
+        abort_unless($settings->allowsAdminSignup(), 404);
 
         return view('auth.register', [
             'passwordMinLength' => (int) $settings->get('security.password_min_length', 8),
@@ -74,10 +76,13 @@ class AuthController extends Controller
         $status = PasswordBroker::reset(
             $attributes,
             function (User $user, string $password): void {
-                $user->forceFill([
-                    'password' => $password,
-                    'remember_token' => Str::random(60),
-                ])->save();
+                DB::transaction(function () use ($user, $password): void {
+                    $user->forceFill([
+                        'password' => $password,
+                        'remember_token' => Str::random(60),
+                    ])->save();
+                    $user->tokens()->where('name', User::MOBILE_TOKEN_NAME)->delete();
+                });
 
                 event(new PasswordReset($user));
             }
@@ -109,7 +114,7 @@ class AuthController extends Controller
             ->orWhere('username', $attributes['login'])
             ->first();
 
-        if ($user && in_array($user->effectiveAccountStatus(), [User::STATUS_INACTIVE, User::STATUS_SUSPENDED, User::STATUS_BANNED], true)) {
+        if ($user?->isAccountUnavailable()) {
             RateLimiter::hit($key, 60);
 
             return back()
@@ -142,7 +147,7 @@ class AuthController extends Controller
 
     public function register(Request $request, Settings $settings): RedirectResponse
     {
-        abort_unless($settings->get('security.admin_signup_enabled', true), 404);
+        abort_unless($settings->allowsAdminSignup(), 404);
 
         $attributes = $request->validate([
             'fullName' => ['sometimes', 'string', 'max:255'],
@@ -155,11 +160,22 @@ class AuthController extends Controller
             'password' => ['required', 'confirmed', Password::min(app(Settings::class)->get('security.password_min_length', 8))],
         ]);
 
-        // Public registration is reserved for administrator accounts. Never
-        // accept a role from the request, so it cannot be changed client-side.
-        $attributes['role'] = User::ROLE_ADMIN;
+        $user = DB::transaction(function () use ($attributes): User {
+            // Lock the setting row so only one unauthenticated request can bootstrap the first admin.
+            Setting::query()->insertOrIgnore([
+                'key' => Settings::ADMIN_SIGNUP,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $gate = Setting::query()->where('key', Settings::ADMIN_SIGNUP)->lockForUpdate()->firstOrFail();
+            if ($gate->value === null) {
+                abort_if(User::where('role', User::ROLE_ADMIN)->lockForUpdate()->first(['id']), 404);
+            } else {
+                abort_unless($gate->value, 404);
+            }
 
-        $user = User::create($attributes);
+            return User::create([...$attributes, 'role' => User::ROLE_ADMIN]);
+        });
 
         Auth::login($user);
         $request->session()->regenerate();

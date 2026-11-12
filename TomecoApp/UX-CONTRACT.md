@@ -27,9 +27,13 @@ empty, failure/retry, clear, keyboard, and composition-safe behavior owned by
 `area-assignments.index` uses the shared dashboard shell, user avatars, and table
 with a scoped `area-assignments.css` layout. The toolbar wraps on narrow screens;
 only the labelled, keyboard-focusable table region scrolls horizontally. Native
-area selects keep platform-owned popups. Row Save buttons use the compact pale
-outlined style. Failed selections are restored only for the submitted
-`assignment_user_id`. Add Area keeps the entered name, reopens on validation
+area selects keep platform-owned popups. Each row lists the saved duty areas
+and opens the shared Edit areas dialog for that enforcer. The dialog supports
+up to five distinct areas and focuses its heading on entry. The area filter
+matches any saved duty area. Failed selections reopen the dialog for the
+submitted `assignment_user_id` and focus the first invalid field. Closing
+the dialog returns focus to its row action and discards unsaved changes.
+Add Area keeps the entered name, reopens on validation
 failure, and restores focus on close. Submit controls lock until navigation and
 recover on history restoration. Admin and supervisor team authorization and
 existing assignment routes remain the source of truth.
@@ -65,13 +69,13 @@ Verification: `AuditLogTest` and the browser preview.
 ## Canonical UI map
 
 The administrator Attendance navigation opens the enforcer listing directly.
-The supervisor attendance listing has been removed; legacy `type=supervisor`
-and unsupported role filters also show enforcers. Existing supervisor attendance
-records and their administrator-only detail routes remain available.
+Legacy `type=supervisor` and unsupported role filters also show enforcers.
+Supervisor clock-in, clock-out, and attendance history have been removed.
+Historical supervisor attendance audit entries remain available in the audit log.
 
 | Capability | Canonical owner | Source of truth | Allowed variants | Verification |
 |---|---|---|---|---|
-| Data table | `.users-table`, `components.attendance-history-table` | DESIGN.md and this contract | Enforcer and supervisor history | Attendance feature tests and browser preview |
+| Data table | `.users-table`, `components.attendance-history-table` | DESIGN.md and this contract | Enforcer history | Attendance feature tests and browser preview |
 | Form | `supervisor.attendance` restriction form | `AdminAttendanceController::updateRestrictions` | Individual daily schedule | EnforcerDutySessionsTest and browser validation |
 | Date | Native HTML time/date inputs | DESIGN.md, server H:i validation, AnalyticsReport date validation | Platform-owned time/calendar popup | Browser keyboard and narrow dialog checks, AnalyticsTest Manila boundaries |
 | Select/Listbox | Native HTML select | Existing attendance list | Platform-owned sort popup | Browser keyboard check |

@@ -57,10 +57,12 @@ class ViolationRecords
         if ($search !== '') {
             // Names and plates are encrypted. Search decrypted values in bounded chunks,
             // never ciphertext with LIKE, and never persist decrypted search indexes.
-            $matchingIds = (clone $query)->whereHas('issuedViolations', fn ($items) => $items
-                ->where('description_snapshot', 'like', '%'.$search.'%')
-                ->orWhereHas('formOption', fn ($options) => $options->where('label', 'like', '%'.$search.'%'))
-                ->orWhereHas('type', fn ($types) => $types->where('section_id', $search)))
+            $matchingIds = (clone $query)->where(fn ($matches) => $matches
+                ->where('citation_number', strtoupper(ltrim($search, '#')))
+                ->orWhereHas('issuedViolations', fn ($items) => $items
+                    ->where('description_snapshot', 'like', '%'.$search.'%')
+                    ->orWhereHas('formOption', fn ($options) => $options->where('label', 'like', '%'.$search.'%'))
+                    ->orWhereHas('type', fn ($types) => $types->where('section_id', $search))))
                 ->pluck('id')->mapWithKeys(fn ($id) => [$id => true])->all();
             $needle = mb_strtolower($search);
             $plateNeedle = mb_strtolower(preg_replace('/[^\pL\pN]/u', '', $search));

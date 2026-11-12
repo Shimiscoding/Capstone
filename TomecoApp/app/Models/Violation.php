@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class Violation extends Model
@@ -20,9 +22,12 @@ class Violation extends Model
 
     protected $appends = ['violation_type'];
 
+    protected $hidden = ['vehicle_type_key', 'submission_fingerprint'];
+
     private ?string $pendingViolationText = null;
 
     protected $fillable = [
+        'citation_number',
         'enforcer_id',
         'enforcer_name',
         'first_name',
@@ -30,6 +35,10 @@ class Violation extends Model
         'last_name',
         'license_number',
         'license_type',
+        'license_expiration_date',
+        'driver_address',
+        'accident_involved',
+        'driver_response',
         'plate_number',
         'vehicle_type',
         'registration_plate_number',
@@ -49,6 +58,7 @@ class Violation extends Model
         'signature',
         'enforcer_signature',
         'motorist_key',
+        'submission_fingerprint',
     ];
 
     protected function casts(): array
@@ -58,7 +68,13 @@ class Violation extends Model
             'middle_name' => 'encrypted',
             'last_name' => 'encrypted',
             'license_number' => 'encrypted',
+            'license_type' => 'encrypted',
+            'license_expiration_date' => 'encrypted',
+            'driver_address' => 'encrypted',
+            'accident_involved' => 'boolean',
+            'driver_response' => 'encrypted',
             'plate_number' => 'encrypted',
+            'vehicle_type' => 'encrypted',
             'registration_plate_number' => 'encrypted',
             'vehicle_make' => 'encrypted',
             'vehicle_series' => 'encrypted',
@@ -72,17 +88,40 @@ class Violation extends Model
             'location' => 'encrypted',
             'signature' => 'encrypted',
             'enforcer_signature' => 'encrypted',
+            'fine_amount' => 'float',
         ];
     }
 
     protected static function booted(): void
     {
         static::saving(function (Violation $violation): void {
-            $violation->motorist_key = self::makeMotoristKey(
-                $violation->license_number,
-                $violation->full_name,
-            );
+            $motoristKey = self::makeMotoristKey($violation->license_number, $violation->full_name);
+            if ($motoristKey === self::makeMotoristKey(null, null)) {
+                $originalName = implode(' ', [
+                    $violation->getOriginal('first_name'), $violation->getOriginal('middle_name'), $violation->getOriginal('last_name'),
+                ]);
+                $wasAnonymous = self::makeMotoristKey($violation->getOriginal('license_number'), $originalName) === $motoristKey;
+                $originalKey = $violation->getRawOriginal('motorist_key');
+                $motoristKey = $wasAnonymous && $originalKey && $originalKey !== $motoristKey
+                    ? $originalKey
+                    : self::makeAnonymousMotoristKey((string) Str::uuid());
+            }
+            $violation->motorist_key = $motoristKey;
+            if ($violation->isDirty('vehicle_type')) {
+                $violation->vehicle_type_key = self::makeVehicleTypeKey($violation->vehicle_type);
+            }
         });
+    }
+
+    public static function makeVehicleTypeKey(?string $vehicleType): ?string
+    {
+        if ($vehicleType === null) {
+            return null;
+        }
+
+        $label = mb_convert_case(rtrim($vehicleType, ' '), MB_CASE_FOLD, 'UTF-8');
+
+        return hash_hmac('sha256', 'ticket-vehicle-type:'.$label, Crypt::getKey());
     }
 
     public static function makeMotoristKey(?string $licenseNumber, ?string $fullName): string
@@ -94,11 +133,21 @@ class Violation extends Model
         return hash_hmac('sha256', $identity, (string) config('app.key'));
     }
 
+    public static function makeAnonymousMotoristKey(string $reference): string
+    {
+        return hash_hmac('sha256', 'unidentified-ticket:'.$reference, (string) config('app.key'));
+    }
+
     public function getFullNameAttribute(): string
     {
         return collect([$this->first_name, $this->middle_name, $this->last_name])
             ->filter(fn (?string $name): bool => filled($name))
             ->implode(' ');
+    }
+
+    public function getDisplayTicketNumberAttribute(): string
+    {
+        return $this->citation_number ?? '#'.str_pad((string) $this->getKey(), 7, '0', STR_PAD_LEFT);
     }
 
     public function enforcer(): BelongsTo

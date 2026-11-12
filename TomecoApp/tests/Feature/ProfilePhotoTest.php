@@ -23,11 +23,14 @@ class ProfilePhotoTest extends TestCase
         $path = $officer->fresh()->profile_photo_path;
         Storage::disk('local')->assertExists($path);
         $this->get($officer->fresh()->profile_photo_url)->assertOk();
+        $this->getJson('/api/auth/profile')->assertJsonPath('data.profile_photo_url', $officer->fresh()->profile_photo_url);
+        $this->get('/api/users/'.$officer->id.'/profile-photo')->assertOk()->assertHeader('X-Content-Type-Options', 'nosniff');
         $this->postJson('/api/auth/profile-photo', ['profile_photo' => UploadedFile::fake()->image('replacement.jpg', 100, 100)])->assertOk();
         Storage::disk('local')->assertMissing($path);
         $this->assertArrayNotHasKey('profile_photo_path', $officer->fresh()->toArray());
         $this->postJson('/api/auth/profile-photo', ['remove_profile_photo' => true])->assertOk()->assertJsonPath('profile_photo_url', null);
         $this->assertNull($officer->fresh()->profile_photo_path);
+        $this->get('/api/users/'.$officer->id.'/profile-photo')->assertNotFound();
     }
 
     public function test_my_profile_form_can_save_a_photo_without_changing_area(): void
@@ -67,5 +70,7 @@ class ProfilePhotoTest extends TestCase
         $this->actingAs($supervisor)->get($url)->assertOk();
         $other = User::factory()->create(['role' => User::ROLE_SUPERVISOR]);
         $this->actingAs($other)->get($url)->assertForbidden();
+        Sanctum::actingAs($other);
+        $this->get('/api/users/'.$officer->id.'/profile-photo')->assertForbidden();
     }
 }

@@ -16,6 +16,7 @@ class ViolationRecordsPageTest extends TestCase
     {
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
         $firstViolation = Violation::create([
+            'citation_number' => 'TMC-A00000000001',
             'first_name' => 'Juan', 'middle_name' => 'Dela', 'last_name' => 'Cruz',
             'license_number' => 'N01-23-456789',
             'license_type' => 'professional', 'plate_number' => 'ABC 1234',
@@ -39,7 +40,7 @@ class ViolationRecordsPageTest extends TestCase
             ->assertSee('Issued tickets')
             ->assertSee('View complete ticket')
             ->assertSee(route('dashboard.violation-records.motorist', $firstViolation))
-            ->assertSee(route('dashboard.violation-records.show', 1))
+            ->assertSee(route('dashboard.violation-records.show', $firstViolation))
             ->assertSee('Illegal parking');
 
         $this->actingAs($admin)->get(route('dashboard.violation-records.motorist', $firstViolation))
@@ -50,11 +51,12 @@ class ViolationRecordsPageTest extends TestCase
             ->assertSee('Illegal parking')
             ->assertSee('Obstruction')
             ->assertSee('XYZ 9876')
+            ->assertSee($firstViolation->display_ticket_number)
             ->assertSee(route('dashboard.violation-records.show', $secondViolation));
 
-        $this->actingAs($admin)->get(route('dashboard.violation-records.show', 1))
+        $this->actingAs($admin)->get(route('dashboard.violation-records.show', $firstViolation))
             ->assertOk()
-            ->assertSee('Violation ticket #0000001')
+            ->assertSee('Violation ticket '.$firstViolation->display_ticket_number)
             ->assertSee('Driver and permit')
             ->assertSee('Vehicle documents')
             ->assertSee('OR-1234567')
@@ -74,6 +76,31 @@ class ViolationRecordsPageTest extends TestCase
         $this->actingAs($admin)->get(route('dashboard.violation-records', ['search' => 'missing ticket']))
             ->assertOk()->assertViewHas('recordSummary', fn ($summary) => $summary['total'] === 0)
             ->assertSeeText('No violation records found');
+    }
+
+    public function test_ticket_details_show_citation_circumstances_and_manila_issue_time(): void
+    {
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $ticket = $this->ticket([
+            'driver_address' => '17 Example Street, Tacloban City',
+            'license_expiration_date' => '2030-12-03',
+            'accident_involved' => false,
+            'driver_response' => 'under_protest',
+        ]);
+        $ticket->forceFill(['created_at' => '2026-10-24 16:05:00'])->save();
+
+        $this->actingAs($admin)->get(route('dashboard.violation-records.show', $ticket))
+            ->assertOk()
+            ->assertSeeText('17 Example Street, Tacloban City')
+            ->assertSeeText('Dec 03, 2030')
+            ->assertSee('<dt>Accident</dt><dd>No</dd>', false)
+            ->assertSeeText('Under Protest')
+            ->assertSeeText('Oct 25, 2026 · 12:05 AM');
+
+        $this->get(route('dashboard.violation-records.show', $this->ticket()))
+            ->assertOk()
+            ->assertSee('<dt>Accident</dt><dd>Not recorded</dd>', false)
+            ->assertSee('<dt>Driver response</dt><dd>Not recorded</dd>', false);
     }
 
     public function test_filters_and_summary_use_the_same_manila_issue_period(): void
@@ -114,7 +141,7 @@ class ViolationRecordsPageTest extends TestCase
             ->assertDontSee('ticketDialog')->assertDontSee('View ticket <svg', false);
         preg_match_all('/<th\b[^>]*>(.*?)<\/th>/s', $response->getContent(), $matches);
         $this->assertSame(['Ticket', 'Driver', 'Vehicle', 'Violation', 'Enforcer', 'Issued', 'Fine / status', 'View Ticket'], array_map('strip_tags', $matches[1]));
-        $response->assertSee('aria-label="View Ticket '.$ticket->id.'"', false);
+        $response->assertSee('aria-label="View Ticket '.$ticket->display_ticket_number.'"', false);
     }
 
     public function test_custom_dates_validate_and_preserve_one_sided_existing_filters(): void

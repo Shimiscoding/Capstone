@@ -11,13 +11,16 @@ use App\Http\Middleware\EnsureApiAccountActive;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/auth/login', [AuthController::class, 'login']);
+Route::post('/auth/forgot-password', [AuthController::class, 'sendPasswordResetLink'])->middleware('throttle:5,1');
 
 Route::middleware(['auth:sanctum', EnsureApiAccountActive::class])->group(function () {
     Route::apiResource('users', UserController::class);
+    Route::get('/users/{user}/profile-photo', [ProfilePhotoController::class, 'show']);
     Route::post('/auth/profile-photo', [ProfilePhotoController::class, 'update']);
     Route::get('/auth/profile', [AuthController::class, 'profile']);
     Route::put('/auth/signature', [AuthController::class, 'updateSignature']);
     Route::post('/auth/logout', [AuthController::class, 'logout']);
+    Route::get('/violations', [ViolationController::class, 'index']);
     Route::post('/violations', [ViolationController::class, 'store']);
     Route::get('/violation-types', [ViolationTypeController::class, 'index']);
     Route::get('/violation-form-options', [ViolationTypeController::class, 'formOptions']);

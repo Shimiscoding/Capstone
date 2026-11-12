@@ -79,7 +79,7 @@ class DashboardSearchController extends Controller
                 $recordRequest = $request->duplicate(['search' => $query, 'period' => 'all', 'page' => 1]);
                 foreach ($records->build($recordRequest)['violations']->take(5) as $ticket) {
                     $results->push([
-                        'kind' => 'Violation records', 'label' => 'Ticket #'.$ticket->id,
+                        'kind' => 'Violation records', 'label' => 'Ticket '.$ticket->display_ticket_number,
                         'description' => $ticket->full_name.' · '.($ticket->plate_number ?: 'No plate recorded'),
                         'url' => route('dashboard.violation-records.show', $ticket),
                     ]);

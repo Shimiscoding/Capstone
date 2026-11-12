@@ -7,47 +7,82 @@ use App\Models\OfficerLocation;
 use App\Models\OfficerLocationHistory;
 use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class OfficerLocationService
 {
+    public const OFF_DUTY = 'off_duty';
+
+    public function __construct(private readonly AttendanceRules $rules) {}
+
     public function update(User $officer, array $data): OfficerLocation
     {
-        if (! $officer->isOfficer() || $officer->effectiveAccountStatus() !== User::STATUS_ACTIVE) {
-            throw new AuthorizationException('Only active officer accounts may share a location.');
-        }
-        if (! $officer->isOnDuty()) {
-            throw new AuthorizationException('Location sharing is only allowed while you are timed in.');
-        }
+        [$location, $changed] = DB::transaction(function () use ($officer, $data): array {
+            // Use the same officer lock as attendance writes so a late upload cannot
+            // restore sharing after a concurrent Time Out.
+            $officer = User::query()->lockForUpdate()->findOrFail($officer->id);
+            if (! $officer->isOfficer() || $officer->effectiveAccountStatus() !== User::STATUS_ACTIVE) {
+                throw new AuthorizationException('Only active officer accounts may share a location.');
+            }
+            $now = now();
+            if (! $officer->isOnDuty($this->rules->date($now))) {
+                throw new AuthorizationException('Location sharing is only allowed while you are timed in.', self::OFF_DUTY);
+            }
 
-        $location = DB::transaction(function () use ($officer, $data): OfficerLocation {
-            $previous = OfficerLocation::where('user_id', $officer->id)->lockForUpdate()->first();
-            $recordedAt = isset($data['recorded_at']) ? now()->parse($data['recorded_at']) : now();
+            $previous = $officer->currentLocation()->first();
+            $recordedAt = isset($data['recorded_at'])
+                ? Carbon::parse($data['recorded_at'])->setTimezone(config('app.timezone'))
+                : $now;
+            if ($previous && $recordedAt->lt($previous->recorded_at)) {
+                return [$previous, false];
+            }
             $values = [...$data, 'team_id' => $officer->supervisor_id, 'is_sharing' => true, 'recorded_at' => $recordedAt];
-            $location = OfficerLocation::updateOrCreate(['user_id' => $officer->id], $values);
+            $location = $officer->currentLocation()->updateOrCreate([], $values);
 
             if ($this->shouldSaveHistory($previous, $location)) {
                 OfficerLocationHistory::create($location->only(['user_id', 'team_id', 'latitude', 'longitude', 'accuracy', 'speed', 'heading', 'recorded_at']));
             }
 
-            return $location;
+            return [$location, true];
         });
 
-        $location->load(['officer.supervisor']);
-        broadcast(new OfficerLocationUpdated($location))->toOthers();
+        if ($changed) {
+            $this->publishLocation($location, toOthers: true);
+        }
 
         return $location;
     }
 
-    public function stopSharing(User $officer): void
+    public function stopSharingIfOffDuty(User $officer): void
     {
-        $location = OfficerLocation::where('user_id', $officer->id)->first();
-        if (! $location) {
-            return;
+        $location = DB::transaction(function () use ($officer): ?OfficerLocation {
+            $officer = User::query()->lockForUpdate()->findOrFail($officer->id);
+            if ($officer->isOnDuty($this->rules->date())) {
+                return null;
+            }
+            $location = $officer->currentLocation()->where('is_sharing', true)->first();
+            $location?->update(['is_sharing' => false]);
+
+            return $location;
+        });
+        if ($location) {
+            DB::afterCommit(fn () => $this->publishLocation($location));
         }
-        $location->update(['is_sharing' => false]);
-        $location->load(['officer.supervisor']);
-        broadcast(new OfficerLocationUpdated($location));
+    }
+
+    private function publishLocation(OfficerLocation $location, bool $toOthers = false): void
+    {
+        // The write has committed. Polling can recover if live broadcasting is unavailable.
+        rescue(function () use ($location, $toOthers): void {
+            $date = $this->rules->date();
+            $location->load(['officer.supervisor', 'officer.enforcerAttendances' => fn ($query) => $query->forDutyDate($date)->limit(1)]);
+            $event = new OfficerLocationUpdated($location);
+            if ($toOthers) {
+                $event->dontBroadcastToCurrentUser();
+            }
+            event($event);
+        });
     }
 
     public function status(OfficerLocation $location, ?bool $onDuty = null): string

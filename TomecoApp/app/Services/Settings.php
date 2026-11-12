@@ -8,6 +8,8 @@ use Illuminate\Support\Facades\Cache;
 
 class Settings
 {
+    public const ADMIN_SIGNUP = 'security.admin_signup_enabled';
+
     public const DEFAULTS = [
         'general.organization_name' => 'TOMECO', 'general.address' => '', 'general.phone' => '', 'general.email' => '', 'general.timezone' => 'Asia/Manila', 'general.date_format' => 'M j, Y', 'general.violation_prefix' => 'VIO-',
         'violations.late_fee' => 0,
@@ -16,7 +18,7 @@ class Settings
         'permissions.supervisor' => ['record_violations', 'export'],
         'notifications.new_violation' => true, 'notifications.overdue_reminder' => true, 'notifications.recipient_email' => '',
         'data.max_upload_mb' => 5, 'data.duplicate_behavior' => 'update', 'data.default_format' => 'xlsx', 'data.history_days' => 90,
-        'security.password_min_length' => 8, 'security.session_timeout' => 120, 'security.login_attempts' => 5, 'security.two_factor' => false, 'security.admin_signup_enabled' => true, 'security.api_token_days' => 30, 'security.audit_retention_days' => 365,
+        'security.password_min_length' => 8, 'security.session_timeout' => 120, 'security.login_attempts' => 5, 'security.two_factor' => false, self::ADMIN_SIGNUP => null, 'security.api_token_days' => 30, 'security.audit_retention_days' => 365,
     ];
 
     public function all(): array
@@ -40,5 +42,12 @@ class Settings
     public function allows(User $user, string $permission): bool
     {
         return in_array($permission, $this->get('permissions.'.$user->role, []), true);
+    }
+
+    public function allowsAdminSignup(): bool
+    {
+        $configured = $this->get(self::ADMIN_SIGNUP);
+
+        return $configured === null ? ! User::where('role', User::ROLE_ADMIN)->exists() : (bool) $configured;
     }
 }

@@ -7,24 +7,18 @@ use App\Models\EnforcerAttendance;
 use App\Models\User;
 use App\Services\AttendanceRules;
 use App\Services\EnforcerDuty;
-use App\Services\OfficerLocationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class AttendanceController extends Controller
 {
-    public function timeIn(Request $request, AttendanceRules $rules): JsonResponse
+    public function timeIn(Request $request, EnforcerDuty $duty): JsonResponse
     {
         $officer = $this->officer($request);
         $coordinates = $this->coordinates($request);
 
-        if ($error = $rules->timeInError($officer)) {
-            return response()->json(['message' => $error], 422);
-        }
-
-        $attendance = app(EnforcerDuty::class)->timeIn($officer, $rules, [
-            'supervisor_id' => $officer->supervisor_id,
-            'time_in' => now(),
+        $attendance = $duty->timeIn($officer, [
             'time_in_latitude' => $coordinates['latitude'] ?? null,
             'time_in_longitude' => $coordinates['longitude'] ?? null,
         ]);
@@ -35,57 +29,43 @@ class AttendanceController extends Controller
         ], 201);
     }
 
-    public function timeOut(Request $request, AttendanceRules $rules, OfficerLocationService $locations): JsonResponse
+    public function timeOut(Request $request, EnforcerDuty $duty): JsonResponse
     {
         $officer = $this->officer($request);
         $coordinates = $this->coordinates($request);
 
-        $attendance = $this->todayAttendance($officer);
-        if ($error = $rules->timeOutError($officer)) {
-            return response()->json(['message' => $error], 422);
+        try {
+            $attendance = $duty->timeOut($officer, $coordinates);
+        } catch (ValidationException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422);
         }
-
-        if (! $attendance?->time_in) {
-            return response()->json(['message' => 'You must time in before timing out.'], 422);
-        }
-
-        if ($attendance->time_out) {
-            return response()->json(['message' => 'You have already timed out today.'], 422);
-        }
-
-        $lastLocation = $officer->currentLocation;
-        $attendance->update([
-            'time_out' => now(),
-            'time_out_latitude' => $coordinates['latitude'] ?? $lastLocation?->latitude,
-            'time_out_longitude' => $coordinates['longitude'] ?? $lastLocation?->longitude,
-        ]);
-        $locations->stopSharing($officer);
 
         return response()->json([
             'message' => 'Time out recorded successfully.',
-            'attendance' => $this->attendanceData($attendance->fresh()),
+            'attendance' => $this->attendanceData($attendance),
         ]);
     }
 
     public function getStatus(Request $request, AttendanceRules $rules): JsonResponse
     {
         $officer = $this->officer($request);
-        $attendance = $this->todayAttendance($officer);
-
-        return response()->json([
-            'session' => EnforcerAttendance::WHOLE_DAY,
-            'date' => $rules->date(),
-            'schedule' => $rules->schedule($officer),
-            'sessions' => [EnforcerAttendance::WHOLE_DAY => [
-                'status' => $attendance?->time_out ? 'timed_out' : ($attendance?->time_in ? 'timed_in' : 'not_timed_in'),
-                'attendance' => $attendance ? $this->attendanceData($attendance) : null,
-            ]],
+        $date = $rules->date();
+        $attendance = $officer->enforcerAttendances()->forDutyDate($date)->first();
+        $sessionData = [
             'status' => match (true) {
                 $attendance?->time_out !== null => 'timed_out',
                 $attendance?->time_in !== null => 'timed_in',
                 default => 'not_timed_in',
             },
             'attendance' => $attendance ? $this->attendanceData($attendance) : null,
+        ];
+
+        return response()->json([
+            'session' => EnforcerAttendance::WHOLE_DAY,
+            'date' => $date,
+            'schedule' => $rules->schedule($officer),
+            'sessions' => [EnforcerAttendance::WHOLE_DAY => $sessionData],
+            ...$sessionData,
         ]);
     }
 
@@ -96,20 +76,6 @@ class AttendanceController extends Controller
         abort_if($user->supervisor_id === null, 422, 'You must be assigned to a supervisor before recording attendance.');
 
         return $user;
-    }
-
-    private function todayAttendance(User $officer): ?EnforcerAttendance
-    {
-        $active = $officer->enforcerAttendances()->whereDate('attendance_date', app(AttendanceRules::class)->date())
-            ->whereNotNull('time_in')->whereNull('time_out')->latest('time_in')->first();
-        if ($active) {
-            return $active;
-        }
-
-        return EnforcerAttendance::where('user_id', $officer->id)
-            ->whereDate('attendance_date', app(AttendanceRules::class)->date())
-            ->latest('time_in')->orderByDesc('id')
-            ->first();
     }
 
     private function attendanceData(EnforcerAttendance $attendance): array

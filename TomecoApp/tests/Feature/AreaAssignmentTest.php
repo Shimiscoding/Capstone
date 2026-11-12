@@ -68,6 +68,38 @@ class AreaAssignmentTest extends TestCase
             ->assertOk()->assertSee($paloOfficer->fullName)->assertDontSee($borgosOfficer->fullName);
     }
 
+    public function test_enforcer_can_have_five_distinct_areas_and_be_filtered_by_any_of_them(): void
+    {
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $officer = User::factory()->create(['role' => User::ROLE_OFFICER, 'area' => 'Abucay']);
+        $areas = ['Abucay', 'Anibong', 'Bagacay', 'Calanipawan', 'San Jose', 'Sagkahan'];
+        foreach (array_slice($areas, 1) as $area) {
+            DB::table('operational_areas')->insert(['name' => $area, 'created_at' => now(), 'updated_at' => now()]);
+        }
+        $index = route('area-assignments.index');
+        $update = route('area-assignments.update', $officer);
+        $assigned = array_slice($areas, 0, 5);
+
+        $this->actingAs($admin)->from($index)->put($update, ['areas' => $assigned])
+            ->assertRedirect($index)->assertSessionHasNoErrors();
+        $this->assertSame($assigned, $officer->fresh()->assignedAreas());
+        $this->assertSame('Abucay', $officer->fresh()->area);
+        $this->get(route('area-assignments.index', ['area' => 'San Jose']))
+            ->assertOk()->assertViewHas('officers', fn ($rows) => $rows->contains('id', $officer->id));
+
+        $this->put($update, ['areas' => $areas])->assertSessionHasErrors('areas');
+        $this->followingRedirects()->put($update, [
+            'assignment_user_id' => $officer->id,
+            'areas' => ['Abucay', 'Abucay'],
+        ])->assertOk()->assertSee('Select each duty area only once.')->assertSee('aria-invalid="true"', false);
+        $this->assertSame($assigned, $officer->fresh()->assignedAreas());
+
+        $this->put($update, ['areas' => [null, 'San Jose', null, null, null]])->assertSessionHasNoErrors();
+        $this->assertSame(['San Jose'], $officer->fresh()->assignedAreas());
+        $this->put($update, ['areas' => [null, null, null, null, null]])->assertSessionHasNoErrors();
+        $this->assertSame([], $officer->fresh()->assignedAreas());
+    }
+
     public function test_supervisors_cannot_receive_areas_even_through_a_direct_request(): void
     {
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);

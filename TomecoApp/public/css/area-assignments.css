@@ -160,8 +160,7 @@
     table-layout: fixed;
 }
 .area-assignment-workspace .area-assignment-table th:first-child { width: 36%; }
-.area-assignment-workspace .area-assignment-table th:nth-child(2) { width: 25%; }
-.area-assignment-workspace .area-assignment-table th:last-child { width: 39%; }
+.area-assignment-workspace .area-assignment-table th:last-child { width: 144px; }
 .area-assignment-workspace .area-assignment-card .area-assignment-table th,
 .area-assignment-workspace .area-assignment-card .area-assignment-table td {
     height: auto;
@@ -200,8 +199,12 @@
     line-height: 1.5;
 }
 .area-assignment-workspace .area-current.is-unassigned { background: var(--soft); color: var(--muted); }
-.area-assignment-workspace .area-assignment-form { display: flex; align-items: flex-start; min-width: 0; max-width: none; margin: 0; gap: 8px; }
-.area-assignment-workspace .area-assignment-field { flex: 1; min-width: 0; }
+.area-assignment-workspace .area-current-list { display: flex; flex-wrap: wrap; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.area-assignment-workspace .area-edit-button { min-height: 36px; background: var(--panel); cursor: pointer; }
+.area-assignment-workspace .area-edit-button:hover { background: var(--soft); }
+.area-assignment-workspace .area-assignment-fields { display: grid; gap: 12px; padding: 20px 24px; }
+.area-assignment-workspace .area-assignment-field { display: grid; grid-template-columns: 88px minmax(0, 1fr); align-items: start; gap: 12px; }
+.area-assignment-workspace .area-assignment-field label { padding-top: 11px; font-size: 13px; font-weight: 600; }
 .area-assignment-workspace .area-assignment-form select {
     width: 100%;
     min-width: 0;
@@ -212,22 +215,9 @@
     background: var(--panel);
     color: var(--text);
     font: inherit;
-    font-size: 12px;
+    font-size: 13px;
     text-overflow: ellipsis;
 }
-.area-assignment-workspace .area-assignment-form button {
-    flex: 0 0 auto;
-    height: 36px;
-    padding: 8px 12px;
-    border: 1px solid var(--line);
-    border-radius: var(--radius-control);
-    background: var(--soft);
-    color: var(--text);
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-}
-.area-assignment-workspace .area-assignment-form button:hover { background: var(--active); border-color: var(--line-strong); }
 .area-assignment-workspace .table-footer { display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; padding: 16px 20px; gap: 16px; color: var(--muted); font-size: 12px; }
 .area-assignment-workspace .pagination-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .area-assignment-workspace .area-page-number { margin: 0 4px; white-space: nowrap; }
@@ -235,18 +225,21 @@
 .area-assignment-workspace .area-assignment-readonly { border-top: 1px solid var(--line); border-radius: var(--radius-surface); }
 .area-assignment-workspace .area-assignment-readonly .area-assignment-table th { width: 25%; }
 .area-assignment-workspace .empty-state .page-button { display: inline-flex; width: fit-content; margin: 12px auto 0; }
-.area-assignment-workspace .area-add-modal { width: min(480px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); border-color: var(--line); border-radius: var(--radius-surface); background: var(--panel); color: var(--text); }
-.area-assignment-workspace .area-add-modal .attendance-modal-head { gap: 16px; padding: 20px 24px; border-color: var(--line); }
-.area-assignment-workspace .area-add-modal .attendance-modal-head h2 { color: var(--text); }
-.area-assignment-workspace .area-add-modal .attendance-modal-head p { color: var(--muted); }
+.area-assignment-workspace .area-modal { width: min(480px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); border-color: var(--line); border-radius: var(--radius-surface); background: var(--panel); color: var(--text); }
+.area-assignment-workspace .area-modal .attendance-modal-head { gap: 16px; padding: 20px 24px; border-color: var(--line); overflow-wrap: anywhere; }
+.area-assignment-workspace .area-modal .attendance-modal-head h2 { color: var(--text); }
+.area-assignment-workspace .area-modal .attendance-modal-head h2:focus { outline: none; }
+.area-assignment-workspace .area-modal .attendance-modal-head p { color: var(--muted); }
+.area-assignment-workspace .area-modal .attendance-modal-head strong { color: var(--text); }
 .area-assignment-workspace .area-add-modal .form-field { padding: 24px; gap: 8px; }
 .area-assignment-workspace .area-add-modal .form-field label { gap: 12px; color: var(--text); }
 .area-assignment-workspace .area-add-modal .form-field label > span { color: var(--muted); font-size: 12px; font-weight: 400; }
 .area-assignment-workspace .area-add-modal .form-field input { min-height: 40px; border-color: var(--line-strong); border-radius: var(--radius-control); background: var(--panel); color: var(--text); }
-.area-assignment-workspace .area-add-modal .attendance-modal-actions { padding: 16px 24px; border-color: var(--line); background: var(--soft); }
+.area-assignment-workspace .area-modal .attendance-modal-actions { padding: 16px 24px; border-color: var(--line); background: var(--soft); }
 .area-assignment-workspace .area-field-error { display: block; margin-top: 8px; color: var(--accent); font-size: 12px; line-height: 1.5; }
 .area-assignment-workspace .area-field-error[hidden] { display: none; }
-.area-assignment-workspace [aria-invalid="true"] { border-color: var(--accent); }
+.area-assignment-workspace .area-assignment-form select[aria-invalid="true"],
+.area-assignment-workspace .area-add-modal .form-field input[aria-invalid="true"] { border-color: var(--accent); }
 .area-assignment-workspace button:disabled { cursor: wait; opacity: .65; }
 .area-assignment-workspace button:focus-visible,
 .area-assignment-workspace a:focus-visible,
@@ -271,7 +264,10 @@
     .area-assignment-workspace .area-assignment-toolbar .toolbar-text-button { order: 1; flex-basis: 100%; justify-content: center; }
     .area-assignment-workspace .table-footer { padding: 16px; }
     .area-assignment-workspace .pagination-actions { width: 100%; justify-content: space-between; }
-    .area-assignment-workspace .area-add-modal .attendance-modal-head,
+    .area-assignment-workspace .area-modal .attendance-modal-head,
+    .area-assignment-workspace .area-assignment-fields,
     .area-assignment-workspace .area-add-modal .form-field { padding: 20px; }
-    .area-assignment-workspace .area-add-modal .attendance-modal-actions { padding: 16px 20px; }
+    .area-assignment-workspace .area-assignment-field { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+    .area-assignment-workspace .area-assignment-field label { padding-top: 0; }
+    .area-assignment-workspace .area-modal .attendance-modal-actions { padding: 16px 20px; }
 }

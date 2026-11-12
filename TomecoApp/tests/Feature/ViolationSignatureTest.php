@@ -47,7 +47,7 @@ class ViolationSignatureTest extends TestCase
         $this->assertNotSame($violation->signature, $violation->getRawOriginal('signature'));
     }
 
-    public function test_phone_submission_requires_a_signature(): void
+    public function test_phone_submission_allows_signatures_to_be_omitted(): void
     {
         Sanctum::actingAs(User::factory()->create(['role' => User::ROLE_OFFICER]));
 
@@ -59,7 +59,7 @@ class ViolationSignatureTest extends TestCase
             'violation_type' => 'Illegal parking',
             'fine_amount' => 500,
             'evidence_image' => 'data:image/jpeg;base64,ZXZpZGVuY2U=',
-        ])->assertUnprocessable()->assertJsonValidationErrors('signature');
+        ])->assertCreated()->assertJsonPath('data.signature', null)->assertJsonPath('data.enforcer_signature', null);
     }
 
     public function test_enforcer_can_save_and_retrieve_their_signature_from_phone(): void

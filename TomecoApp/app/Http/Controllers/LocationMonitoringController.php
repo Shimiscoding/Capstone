@@ -5,10 +5,12 @@ namespace App\Http\Controllers;
 use App\Models\OfficerLocation;
 use App\Models\OfficerLocationHistory;
 use App\Models\User;
+use App\Services\AttendanceRules;
 use App\Services\OfficerLocationService;
 use App\Support\OfficerLocationData;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -21,11 +23,11 @@ class LocationMonitoringController extends Controller
         return view('location-monitoring.index', ['googleMapsKey' => config('services.google_maps.browser_key'), 'mapCenter' => config('officer-location.map_center'), 'thresholds' => ['active' => config('officer-location.active_seconds'), 'offline' => config('officer-location.offline_seconds')]]);
     }
 
-    public function officers(Request $request, OfficerLocationService $service): JsonResponse
+    public function officers(Request $request, OfficerLocationService $service, AttendanceRules $rules): JsonResponse
     {
         $viewer = $request->user();
         $this->authorizeViewer($viewer);
-        $officers = $this->authorizedLocations($viewer)->get()->map(fn ($location) => OfficerLocationData::make($location, $service))->values();
+        $officers = $this->authorizedLocations($viewer, $rules->date())->get()->map(fn ($location) => OfficerLocationData::make($location, $service))->values();
         $statuses = $officers->countBy('status');
 
         return response()->json([
@@ -46,10 +48,18 @@ class LocationMonitoringController extends Controller
         return response()->json(['officer' => ['id' => $officer->id, 'name' => $officer->fullName], 'points' => $points]);
     }
 
-    private function authorizedLocations(User $viewer): Builder
+    public function details(Request $request, User $officer): RedirectResponse
+    {
+        $viewer = $request->user();
+        $this->authorizeOfficer($viewer, $officer);
+
+        return to_route($viewer->isAdmin() ? 'dashboard.users.enforcers.show' : 'supervisor.enforcers.attendance', $officer);
+    }
+
+    private function authorizedLocations(User $viewer, string $date): Builder
     {
         return OfficerLocation::query()->whereHas('officer', fn (Builder $query) => $query->where('role', User::ROLE_OFFICER)->when($viewer->isSupervisor(), fn (Builder $query) => $query->where('supervisor_id', $viewer->id)))
-            ->with(['officer.supervisor', 'officer.enforcerAttendances' => fn ($query) => $query->whereNotNull('time_in')->latest('time_in')->limit(1)]);
+            ->with(['officer.supervisor', 'officer.enforcerAttendances' => fn ($query) => $query->forDutyDate($date)->limit(1)]);
     }
 
     private function authorizeViewer(User $viewer): void

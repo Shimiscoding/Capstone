@@ -2,7 +2,6 @@
 
 namespace App\Http\Middleware;
 
-use App\Models\User;
 use Closure;
 use Illuminate\Http\Request;
 
@@ -12,7 +11,7 @@ class EnsureApiAccountActive
     {
         $user = $request->user();
         abort_if($user?->isCashier(), 403, 'Cashier accounts have access only to the website ticket overview.');
-        abort_if($user && in_array($user->effectiveAccountStatus(), [User::STATUS_INACTIVE, User::STATUS_SUSPENDED, User::STATUS_BANNED], true), 403, 'This account is unavailable. Contact an administrator.');
+        abort_if($user?->isAccountUnavailable(), 403, 'This account is unavailable. Contact an administrator.');
 
         return $next($request);
     }

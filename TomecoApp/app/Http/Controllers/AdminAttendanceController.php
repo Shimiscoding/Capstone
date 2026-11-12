@@ -3,19 +3,37 @@
 namespace App\Http\Controllers;
 
 use App\Models\EnforcerAttendance;
-use App\Models\SupervisorAttendance;
 use App\Models\User;
 use App\Notifications\AttendanceTimeOutUpdated;
 use App\Services\OfficerLocationService;
+use App\Support\StaffDirectory;
+use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\Rule;
 
 class AdminAttendanceController extends Controller
 {
+    public function index(Request $request): View
+    {
+        $this->ensureAdmin($request);
+
+        $directory = new StaffDirectory($request);
+        $officers = User::query()->where('role', User::ROLE_OFFICER)->withCount('enforcerAttendances');
+        $directory->filter($officers, 'email');
+
+        return view('supervisor.attendance', [
+            'staffMembers' => $directory->order($officers)->paginate(10)->withQueryString(),
+            'search' => $directory->search,
+            'sort' => $directory->sort,
+            'attendanceType' => 'enforcer',
+        ]);
+    }
+
     public function updateRestrictions(Request $request, User $user): RedirectResponse
     {
         $this->ensureAdmin($request);
@@ -34,16 +52,6 @@ class AdminAttendanceController extends Controller
         return back()->with('attendance_success', 'Attendance restrictions updated for '.$user->fullName.'.');
     }
 
-    public function updateSupervisorTimeOut(
-        Request $request,
-        SupervisorAttendance $attendance,
-    ): RedirectResponse|JsonResponse {
-        $this->ensureAdmin($request);
-        $this->updateTimeOut($request, $attendance);
-
-        return $this->attendanceResponse($request, 'Supervisor attendance updated successfully.');
-    }
-
     public function updateEnforcerTimeOut(
         Request $request,
         EnforcerAttendance $attendance,
@@ -54,37 +62,27 @@ class AdminAttendanceController extends Controller
         return $this->attendanceResponse($request, 'Enforcer attendance updated successfully.');
     }
 
-    public function destroySupervisorAttendance(Request $request, SupervisorAttendance $attendance): RedirectResponse|JsonResponse
-    {
-        $this->ensureAdmin($request);
-        $staff = $attendance->user;
-        $attendance->delete();
-
-        return $this->attendanceResponse($request, 'Attendance record deleted.', $this->historyUrl($request, $staff, false));
-    }
-
     public function destroyEnforcerAttendance(Request $request, EnforcerAttendance $attendance): RedirectResponse|JsonResponse
     {
         $this->ensureAdmin($request);
         $staff = $attendance->user;
-        DB::transaction(function () use ($attendance): void {
+        DB::transaction(function () use ($attendance, $staff): void {
+            User::query()->lockForUpdate()->findOrFail($staff->id);
             $record = EnforcerAttendance::query()->lockForUpdate()->findOrFail($attendance->id);
             // Model deletion events retain the record in the existing audit trail.
             $record->delete();
+            app(OfficerLocationService::class)->stopSharingIfOffDuty($staff);
         });
-        if (! $staff->isOnDuty()) {
-            app(OfficerLocationService::class)->stopSharing($staff);
-        }
 
-        return $this->attendanceResponse($request, 'Attendance record deleted.', $this->historyUrl($request, $staff, true));
+        return $this->attendanceResponse($request, 'Attendance record deleted.', $this->historyUrl($request, $staff));
     }
 
-    private function historyUrl(Request $request, User $staff, bool $enforcer): string
+    private function historyUrl(Request $request, User $staff): string
     {
-        $count = $enforcer ? $staff->enforcerAttendances()->count() : $staff->supervisorAttendances()->count();
+        $count = $staff->enforcerAttendances()->count();
         $page = max(1, min($request->integer('page', 1), (int) ceil($count / 20)));
 
-        return route($enforcer ? 'dashboard.attendance.enforcers.show' : 'dashboard.attendance.supervisor', ['user' => $staff, 'page' => $page]);
+        return route('dashboard.attendance.enforcers.show', ['user' => $staff, 'page' => $page]);
     }
 
     private function attendanceResponse(Request $request, string $message, ?string $redirect = null): RedirectResponse|JsonResponse
@@ -98,7 +96,7 @@ class AdminAttendanceController extends Controller
 
     private function updateTimeOut(
         Request $request,
-        SupervisorAttendance|EnforcerAttendance $attendance,
+        EnforcerAttendance $attendance,
     ): void {
         $attributes = $request->validate([
             'time_in' => ['required', 'date_format:H:i'],
@@ -116,21 +114,15 @@ class AdminAttendanceController extends Controller
 
         abort_if($timeOut->lte($timeIn), 422, 'Time Out must be after Time In and cannot be the same time.');
 
-        $attendance->update(['time_in' => $timeIn, 'time_out' => $timeOut]);
-        if ($attendance instanceof EnforcerAttendance && ! $attendance->user->isOnDuty()) {
-            app(OfficerLocationService::class)->stopSharing($attendance->user);
-        }
         $staff = $attendance->user;
-        $notification = new AttendanceTimeOutUpdated(
-            $staff->fullName,
-            $attendance->attendance_date,
-            $timeIn,
-            $timeOut,
-            $request->user()->fullName,
-        );
+        DB::transaction(function () use ($attendance, $staff, $timeIn, $timeOut): void {
+            User::query()->lockForUpdate()->findOrFail($staff->id);
+            $record = EnforcerAttendance::query()->lockForUpdate()->findOrFail($attendance->id);
+            $record->update(['time_in' => $timeIn, 'time_out' => $timeOut]);
+            app(OfficerLocationService::class)->stopSharingIfOffDuty($staff);
+        });
 
-        $staff->notify($notification);
-        $request->user()->notify(new AttendanceTimeOutUpdated(
+        Notification::send([$staff, $request->user()], new AttendanceTimeOutUpdated(
             $staff->fullName,
             $attendance->attendance_date,
             $timeIn,

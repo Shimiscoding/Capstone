@@ -11,6 +11,7 @@ class EnsureUserCanAccessWebsite
 {
     public function handle(Request $request, Closure $next): Response
     {
+        abort_if($request->user()?->isAccountUnavailable(), 403, 'This account is unavailable. Contact an administrator.');
         abort_if($request->user()?->role === User::ROLE_OFFICER, 403, 'Enforcer accounts are available only in the mobile app.');
 
         if ($request->user()?->isCashier() && ! $request->routeIs('dashboard', 'cashier.dashboard')) {

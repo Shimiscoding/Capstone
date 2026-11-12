@@ -4,6 +4,7 @@ namespace Tests\Feature\Api;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -13,6 +14,7 @@ class OfficerAttendanceTest extends TestCase
 
     public function test_officer_can_time_in_check_status_and_time_out(): void
     {
+        $this->travelTo(Carbon::parse('2026-11-10T16:30:00Z'));
         $supervisor = User::factory()->create(['role' => User::ROLE_SUPERVISOR]);
         $officer = User::factory()->create([
             'role' => User::ROLE_OFFICER,
@@ -31,7 +33,7 @@ class OfficerAttendanceTest extends TestCase
             'longitude' => 125.0031,
         ])
             ->assertCreated()
-            ->assertJsonPath('attendance.date', today()->toDateString())
+            ->assertJsonPath('attendance.date', '2026-11-11')
             ->assertJsonPath('attendance.time_in_location.latitude', 11.2445)
             ->assertJsonPath('attendance.time_in_location.longitude', 125.0031);
 

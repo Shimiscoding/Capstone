@@ -3,7 +3,7 @@
 // Uses the real normalized MySQL schema inside one outer transaction. Fictional
 // tickets, officer, token, and audit rows are always rolled back, even on failure.
 use App\Http\Controllers\Api\ViolationController;
-use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\ViolationRecordsController;
 use App\Models\User;
 use App\Models\Violation;
 use App\Services\TicketEvidence;
@@ -58,7 +58,7 @@ try {
     ];
     $request = Request::create(config('app.url').'/api/violations', 'POST', $fields, [], ['evidence_images' => $files], ['HTTP_ACCEPT' => 'application/json']);
     $request->setUserResolver(fn () => $officer);
-    $response = app(ViolationController::class)->store($request);
+    $response = $app->call([app(ViolationController::class), 'store'], ['request' => $request]);
     if ($response->getStatusCode() !== 201) {
         throw new RuntimeException('Submission failed.');
     }
@@ -82,7 +82,7 @@ try {
     $request->setUserResolver(fn () => Auth::user());
     $request->setLaravelSession($app->make('session')->driver());
     $app->instance('request', $request);
-    $html = app(DashboardController::class)->violationRecord($ticket->fresh())->render();
+    $html = app(ViolationRecordsController::class)->violationRecord($ticket->fresh())->render();
     // Embed only fictional QA photos for the standalone browser snapshot.
     foreach ($evidenceReferences as $index => $reference) {
         $html = str_replace(route('tickets.evidence', [$ticket, $index]), 'data:image/jpeg;base64,'.base64_encode(TicketEvidence::read($reference)), $html);

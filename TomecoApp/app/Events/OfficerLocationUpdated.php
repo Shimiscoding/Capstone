@@ -19,7 +19,9 @@ class OfficerLocationUpdated implements ShouldBroadcastNow
 
     public function broadcastOn(): array
     {
-        return $this->location->team_id ? [new PrivateChannel('team.'.$this->location->team_id.'.locations')] : [];
+        $teamId = $this->location->officer->supervisor_id;
+
+        return $teamId ? [new PrivateChannel('team.'.$teamId.'.locations')] : [];
     }
 
     public function broadcastAs(): string

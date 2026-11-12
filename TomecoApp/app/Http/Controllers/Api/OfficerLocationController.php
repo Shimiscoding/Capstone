@@ -18,10 +18,14 @@ class OfficerLocationController extends Controller
             $location = $service->update($request->user(), $request->validated());
 
             return response()->json(['message' => 'Location updated.', 'recorded_at' => $location->recorded_at]);
-        } catch (Throwable $exception) {
-            if ($exception instanceof AuthorizationException) {
-                throw $exception;
+        } catch (AuthorizationException $exception) {
+            if ($exception->getCode() === OfficerLocationService::OFF_DUTY) {
+                return response()->json(['message' => $exception->getMessage()], 403, [
+                    'X-Tomeco-Location-Status' => OfficerLocationService::OFF_DUTY,
+                ]);
             }
+            throw $exception;
+        } catch (Throwable $exception) {
             Log::error('Officer location update failed.', ['user_id' => $request->user()->id, 'exception' => $exception]);
 
             return response()->json(['message' => 'Unable to update location.'], 500);

@@ -4,8 +4,11 @@ namespace Tests\Feature;
 
 use App\Models\EnforcerAttendance;
 use App\Models\User;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -175,8 +178,15 @@ class EnforcerDutySessionsTest extends TestCase
 
     public function test_migration_keeps_history_and_carries_final_time_out_into_the_daily_schedule(): void
     {
+        // Recreate the pre-cleanup schema to exercise the historical migration.
+        Schema::table('users', function (Blueprint $table): void {
+            $table->time('attendance_afternoon_time_out_start')->nullable();
+            $table->time('attendance_afternoon_time_out_end')->nullable();
+        });
         $this->officer->update([
             'attendance_time_out_start' => '11:30', 'attendance_time_out_end' => '12:00',
+        ]);
+        DB::table('users')->where('id', $this->officer->id)->update([
             'attendance_afternoon_time_out_start' => '16:00', 'attendance_afternoon_time_out_end' => '18:00',
         ]);
         foreach (['morning', 'afternoon'] as $session) {

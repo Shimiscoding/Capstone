@@ -24,7 +24,7 @@ class AuditLogController extends Controller
 
         $query = AuditLog::query()
             ->with('user')
-            ->whereIn('auditable_type', AuditLogger::AUDITABLE_TYPES)
+            ->whereIn('auditable_type', [...AuditLogger::AUDITABLE_TYPES, 'App\Models\SupervisorAttendance'])
             ->when($search !== '', fn ($query) => $query->where(function ($query) use ($search): void {
                 $query->where('subject_label', 'like', "%{$search}%")
                     ->orWhere('actor_name', 'like', "%{$search}%")

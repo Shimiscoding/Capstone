@@ -81,7 +81,7 @@
                 <tbody>
                     @forelse ($recentViolations as $violation)
                         @php
-                            $ticketNumber = '#'.str_pad((string) $violation->id, 7, '0', STR_PAD_LEFT);
+                            $ticketNumber = $violation->display_ticket_number;
                             $issued = $violation->created_at?->copy()->setTimezone('Asia/Manila');
                             $isPaid = $violation->status === 'paid';
                         @endphp
